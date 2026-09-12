@@ -181,6 +181,7 @@ input[type="number"].input { padding-right: 6px; }
 .check input { width: 15px; height: 15px; accent-color: var(--cyan); cursor: pointer; }
 .check.small { font-size: 11.5px; }
 .sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+.slider-row.single { margin-top: 8px; }
 .slider-row label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
 input[type="range"] { width: 100%; accent-color: var(--cyan); height: 20px; cursor: pointer; }
 .segmented { display: inline-flex; padding: 3px; background: #0a0e18; border: 1px solid #22304a; border-radius: 9px; }

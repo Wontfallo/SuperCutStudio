@@ -141,11 +141,14 @@
             <label class="check"><input type="checkbox" id="setting-high-energy"><span>Also detect high-energy speech</span></label>
             <label class="check"><input type="checkbox" id="setting-auto-keywords"><span>Auto-add discovered keywords</span></label>
           </div>
+          <div class="slider-row single">
+            <label for="setting-fuzzy">Fuzzy match tolerance <span id="fuzzy-label" class="mono muted">off</span></label>
+            <input type="range" id="setting-fuzzy" min="0" max="0.95" step="0.05" value="0">
+          </div>
+
+          <div class="divider"></div>
+          <div class="label-row"><span>Clip boundaries</span><span class="muted">seconds before / after each hit</span></div>
           <div class="sliders">
-            <div class="slider-row">
-              <label for="setting-fuzzy">Fuzzy match <span id="fuzzy-label" class="mono muted">off</span></label>
-              <input type="range" id="setting-fuzzy" min="0" max="0.95" step="0.05" value="0">
-            </div>
             <div class="slider-row">
               <label for="setting-pre-pad">Pre-pad <span id="pre-pad-label" class="mono muted">1.0s</span></label>
               <input type="range" id="setting-pre-pad" min="0" max="10" step="0.1" value="1">
