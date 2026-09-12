@@ -557,6 +557,31 @@ function renderScannedFiles(data) {
   });
 }
 
+function setAllExcluded(excluded) {
+  if (!appConfig.excluded_files) appConfig.excluded_files = [];
+  if (excluded) {
+    const have = new Set(appConfig.excluded_files.map((p) => String(p).toLowerCase()));
+    for (const f of scannedFiles) if (!have.has(f.path.toLowerCase())) appConfig.excluded_files.push(f.path);
+  } else {
+    const listed = new Set(scannedFiles.map((f) => f.path.toLowerCase()));
+    appConfig.excluded_files = appConfig.excluded_files.filter((p) => !listed.has(String(p).toLowerCase()));
+  }
+  renderScannedFiles({ is_file: false });
+  scheduleSave();
+}
+window.setAllExcluded = setAllExcluded;
+
+function clearSourceList() {
+  scannedFiles = [];
+  appConfig.excluded_files = [];
+  appConfig.input_path = '';
+  $('input-path').value = '';
+  $('scanned-list').innerHTML = '';
+  $('scanned-assets-container').classList.add('hidden');
+  scheduleSave();
+}
+window.clearSourceList = clearSourceList;
+
 function toggleExcludedFile(idx) {
   const f = scannedFiles[idx];
   if (!f) return;
@@ -899,13 +924,7 @@ async function resetSession() {
     const player = $('studio-video-player'); player.removeAttribute('src'); player.dataset.path = ''; player.load();
     updateScrubberUI(0, 0);
     // Source selection is part of the session too: clear the path, file list and per-file exclusions (keywords stay).
-    scannedFiles = [];
-    $('input-path').value = '';
-    $('scanned-list').innerHTML = '';
-    $('scanned-assets-container').classList.add('hidden');
-    appConfig.excluded_files = [];
-    appConfig.input_path = '';
-    scheduleSave();
+    clearSourceList();
     updateTelemetry(0, 'Ready', 'IDLE', 0, null);
     setJobRunning(false, 'Ready - session cleared');
     switchTab('setup');

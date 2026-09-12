@@ -81,7 +81,12 @@
         <div id="scanned-assets-container" class="hidden">
           <div class="row between small muted">
             <span><strong id="scanned-count" class="text">0</strong> file(s) detected <span id="scanned-info" class="mono"></span></span>
-            <span id="scanned-total" class="mono"></span>
+            <span class="row gap-s">
+              <span id="scanned-total" class="mono"></span>
+              <button class="btn small" onclick="setAllExcluded(true)" title="Leave every listed file out of the job">Remove all</button>
+              <button class="btn small" onclick="setAllExcluded(false)" title="Put every listed file back">Restore all</button>
+              <button class="btn btn-ghost small" onclick="clearSourceList()" title="Forget this source entirely">Clear list</button>
+            </span>
           </div>
           <div id="scanned-list" class="file-list"></div>
         </div>
