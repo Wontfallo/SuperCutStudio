@@ -360,42 +360,6 @@ class SuperCutPipeline:
             self.log("Analysis cancelled by user.", "warn")
         return all_stats
 
-    def discover_keywords(self, input_path_str: str, top_n: int = 15) -> Tuple[List[Tuple[str, float]], List[VideoJobStats]]:
-        """Transcribe the inputs and return the strongest keywords / phrases across them."""
-        video_paths = self.scan_video_inputs(input_path_str)
-        if not video_paths:
-            raise FileNotFoundError(f"No video files found in '{input_path_str}'")
-
-        all_discovered: Dict[str, float] = {}
-        stats_list: List[VideoJobStats] = []
-        n = len(video_paths)
-        self.emit_progress(2.0, f"Loading ASR engine ({self.config.model})...")
-        self._get_transcriber()
-        for idx, vp in enumerate(video_paths, start=1):
-            if self._cancelled:
-                break
-            base = ((idx - 1) / n) * 95.0
-            step = 95.0 / n
-            name = Path(vp).name
-            info = probe_media(vp)
-            if not info:
-                continue
-            self.emit_progress(base, f"[{idx}/{n}] Transcribing {name}")
-            try:
-                transcript, cached = self.transcribe_media(
-                    vp, info, progress=lambda f, m: self.emit_progress(base + step * f, f"[{idx}/{n}] {m}")
-                )
-            except Exception as exc:
-                self.log(f"{name}: {exc}", "err")
-                continue
-            stats_list.append(VideoJobStats(path=vp, info=info, transcript=transcript, transcript_cached=cached))
-            for kw, score in discover_top_keywords(transcript, top_n=top_n):
-                all_discovered[kw] = max(all_discovered.get(kw, 0.0), score)
-
-        ranked = sorted(all_discovered.items(), key=lambda x: -x[1])[:top_n]
-        self.emit_progress(100.0, f"Discovered {len(ranked)} keyword(s)")
-        return ranked, stats_list
-
     # ------------------------------------------------------------------
     # Phase 2: rendering
     # ------------------------------------------------------------------

@@ -11,11 +11,11 @@
 <body>
   <div id="toast-container" aria-live="polite"></div>
 
-  <!-- ================= HEADER ================= -->
+  <!-- ================= HEADER (static, never scaled) ================= -->
   <header class="topbar">
     <div class="brand">
       <div class="brand-logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+        <svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
       </div>
       <div class="brand-text">
         <div class="brand-title">SuperCut Studio <span class="brand-badge">v<!--APP_VERSION--></span></div>
@@ -28,22 +28,25 @@
       <button id="tab-btn-reviewer" class="tab-btn" role="tab" onclick="switchTab('reviewer')"><span class="tab-num">2</span> Reviewer <span id="badge-clip-count" class="tab-badge">0</span></button>
       <button id="tab-btn-transcript" class="tab-btn" role="tab" onclick="switchTab('transcript')"><span class="tab-num">3</span> Transcript</button>
       <button id="tab-btn-export" class="tab-btn" role="tab" onclick="switchTab('export')"><span class="tab-num">4</span> Deliver <span id="badge-result" class="tab-badge hidden">●</span></button>
+      <button id="tab-btn-tools" class="tab-btn" role="tab" onclick="switchTab('tools')"><span class="tab-num">5</span> Tools</button>
     </nav>
 
     <div class="topbar-actions">
-      <div class="scale-ctl" title="UI size (Ctrl+= / Ctrl+- / Ctrl+0 to reset)">
-        <button class="btn btn-icon" onclick="changeUiScale(-0.1)" aria-label="Smaller UI">A−</button>
+      <label class="scale-ctl" title="Scale everything below the header (Ctrl+= / Ctrl+- / Ctrl+0)">
+        <span class="scale-ico">A</span>
+        <input type="range" id="ui-scale-range" min="80" max="200" step="5" value="100" aria-label="UI size">
         <span id="ui-scale-label" class="mono">100%</span>
-        <button class="btn btn-icon" onclick="changeUiScale(0.1)" aria-label="Larger UI">A+</button>
-      </div>
+      </label>
       <button id="btn-cancel" class="btn btn-danger hidden" onclick="cancelJob()" title="Stop the running job (Esc)">■ Stop</button>
-      <button id="btn-quick-analyze" class="btn btn-primary" onclick="triggerAnalyze()" title="Transcribe & detect clips, then review before rendering">Analyze Media</button>
       <button class="btn btn-icon" onclick="openSystemModal()" title="System & diagnostics">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
       <button class="btn btn-icon" onclick="openShortcutsModal()" title="Keyboard shortcuts (?)">?</button>
     </div>
   </header>
+
+  <!-- Everything below scales with the header slider -->
+  <div id="app-scaled">
 
   <!-- ================= TELEMETRY STRIP ================= -->
   <div id="telemetry-bar" class="telemetry">
@@ -58,47 +61,34 @@
 
     <!-- ================= TAB 1: SETUP ================= -->
     <section id="tab-setup" class="tab-content">
-      <div class="grid-2">
 
-        <!-- Media source -->
-        <div class="card span-2">
-          <div class="card-head">
-            <div class="card-title-wrap">
-              <div class="card-icon icon-cyan">📁</div>
-              <div>
-                <h2 class="card-title">Media Source</h2>
-                <p class="card-sub">Point at a folder of videos or a single file. Drag &amp; drop also works.</p>
-              </div>
-            </div>
-            <div class="segmented" role="group" aria-label="Input mode">
-              <button id="mode-folder-btn" class="seg-btn active" onclick="setInputMode('Folder')">Folder</button>
-              <button id="mode-file-btn" class="seg-btn" onclick="setInputMode('File')">Single File</button>
-            </div>
+      <!-- Source -->
+      <div class="card" id="source-card">
+        <div class="row gap wrap">
+          <div class="segmented" role="group" aria-label="Input mode">
+            <button id="mode-folder-btn" class="seg-btn active" onclick="setInputMode('Folder')">Folder</button>
+            <button id="mode-file-btn" class="seg-btn" onclick="setInputMode('File')">Single file</button>
           </div>
-
-          <div class="row gap">
-            <input id="input-path" class="input mono grow" type="text" spellcheck="false"
-                   placeholder="e.g. C:\Videos\Highlights" onkeydown="if(event.key==='Enter'){scanMediaSource();}">
-            <button id="btn-browse" class="btn" onclick="browseInput()" title="Open a native picker">Browse…</button>
-            <button id="btn-scan" class="btn btn-secondary" onclick="scanMediaSource()"><span id="btn-scan-text">Scan</span></button>
-          </div>
-
-          <div id="drop-zone" class="dropzone">
-            <input type="file" id="file-uploader" class="hidden" accept="video/*" onclick="event.stopPropagation()" onchange="handleFileUpload(event)">
-            <div class="dropzone-icon">⤓</div>
-            <div class="dropzone-text">Drop a video here or <span class="link" onclick="event.stopPropagation(); document.getElementById('file-uploader').click();">browse to upload</span></div>
-            <div class="dropzone-hint">MP4 · MKV · MOV · WebM · AVI · TS · M4V · FLV · WMV</div>
-          </div>
-
-          <div id="scanned-assets-container" class="hidden">
-            <div class="row between small muted">
-              <span><strong id="scanned-count" class="text">0</strong> file(s) detected <span id="scanned-info" class="mono"></span></span>
-              <span id="scanned-total" class="mono"></span>
-            </div>
-            <div id="scanned-list" class="file-list"></div>
-          </div>
+          <input id="input-path" class="input mono grow" type="text" spellcheck="false"
+                 placeholder="e.g. C:\Videos\Highlights" onkeydown="if(event.key==='Enter'){scanMediaSource();}">
+          <button id="btn-browse" class="btn" onclick="browseInput()" title="Open a native picker">Browse…</button>
+          <button id="btn-scan" class="btn btn-secondary" onclick="scanMediaSource()"><span id="btn-scan-text">Scan</span></button>
         </div>
+        <div id="drop-zone" class="dropstrip">
+          <input type="file" id="file-uploader" class="hidden" accept="video/*" onclick="event.stopPropagation()" onchange="handleFileUpload(event)">
+          <span>⤓ Drop a video anywhere on this card to upload it, or <span class="link" onclick="event.stopPropagation(); document.getElementById('file-uploader').click();">browse to upload</span></span>
+          <span class="dim">MP4 · MKV · MOV · WebM · AVI · TS · M4V · FLV · WMV</span>
+        </div>
+        <div id="scanned-assets-container" class="hidden">
+          <div class="row between small muted">
+            <span><strong id="scanned-count" class="text">0</strong> file(s) detected <span id="scanned-info" class="mono"></span></span>
+            <span id="scanned-total" class="mono"></span>
+          </div>
+          <div id="scanned-list" class="file-list"></div>
+        </div>
+      </div>
 
+      <div class="grid-2">
         <!-- Keywords -->
         <div class="card">
           <div class="card-head">
@@ -106,7 +96,7 @@
               <div class="card-icon icon-green">#</div>
               <div>
                 <h2 class="card-title">Keyword Matrix</h2>
-                <p class="card-sub">Words or phrases to cut around. Plurals match automatically.</p>
+                <p class="card-sub">Words or phrases to cut around. “sister” also matches sisters, sister's, Sister?</p>
               </div>
             </div>
             <button class="btn btn-ghost small" onclick="clearKeywords()">Clear</button>
@@ -116,38 +106,10 @@
             <input id="keyword-input" class="input grow" type="text" placeholder="Type a keyword, press Enter (comma separates several)"
                    onkeydown="handleKeywordKeydown(event)">
             <button class="btn btn-success" onclick="addKeywordFromInput()">Add</button>
-            <button id="btn-discover" class="btn" onclick="triggerDiscover()" title="Transcribe and suggest the strongest keywords">✨ Auto-discover</button>
           </div>
           <div id="keyword-chips" class="chips"></div>
-          <div id="discovered-panel" class="hidden">
-            <div class="small muted">Suggested from speech (click to add):</div>
-            <div id="discovered-pills" class="pills"></div>
-          </div>
 
-          <div class="divider"></div>
-          <label class="label-row"><span>Exclude keywords <span class="muted">(skip hits inside these)</span></span></label>
-          <div class="row gap">
-            <input id="exclude-input" class="input grow" type="text" placeholder="e.g. sponsor, intro" onkeydown="handleExcludeKeydown(event)">
-            <button class="btn btn-danger-ghost" onclick="addExcludeFromInput()">Exclude</button>
-          </div>
-          <div id="exclude-chips" class="chips chips-exclude"></div>
-
-          <div class="divider"></div>
-          <div class="options-grid">
-            <label class="check"><input type="checkbox" id="setting-case-sensitive"><span>Case-sensitive</span></label>
-            <label class="check"><input type="checkbox" id="setting-regex"><span>Regex patterns</span></label>
-            <label class="check"><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence</span></label>
-            <label class="check"><input type="checkbox" id="setting-snap-silence" checked><span>Snap to silence</span></label>
-            <label class="check"><input type="checkbox" id="setting-high-energy"><span>Also detect high-energy speech</span></label>
-            <label class="check"><input type="checkbox" id="setting-auto-keywords"><span>Auto-add discovered keywords</span></label>
-          </div>
-          <div class="slider-row single">
-            <label for="setting-fuzzy">Fuzzy match tolerance <span id="fuzzy-label" class="mono muted">off</span></label>
-            <input type="range" id="setting-fuzzy" min="0" max="0.95" step="0.05" value="0">
-          </div>
-
-          <div class="divider"></div>
-          <div class="label-row"><span>Clip boundaries</span><span class="muted">seconds before / after each hit</span></div>
+          <div class="label-row top-gap-s"><span>Clip padding</span><span class="muted">seconds kept before / after each hit</span></div>
           <div class="sliders">
             <div class="slider-row">
               <label for="setting-pre-pad">Pre-pad <span id="pre-pad-label" class="mono muted">1.0s</span></label>
@@ -157,25 +119,50 @@
               <label for="setting-post-pad">Post-pad <span id="post-pad-label" class="mono muted">1.0s</span></label>
               <input type="range" id="setting-post-pad" min="0" max="10" step="0.1" value="1">
             </div>
-            <div class="slider-row">
-              <label for="setting-merge-gap">Merge clips closer than <span id="merge-gap-label" class="mono muted">0.5s</span></label>
-              <input type="range" id="setting-merge-gap" min="0" max="5" step="0.1" value="0.5">
-            </div>
-            <div class="slider-row">
-              <label for="setting-max-clip">Max clip length <span id="max-clip-label" class="mono muted">unlimited</span></label>
-              <input type="range" id="setting-max-clip" min="0" max="120" step="1" value="0">
-            </div>
           </div>
+
+          <details class="drawer" id="drawer-matching">
+            <summary>Matching options <span class="muted">exclusions, fuzzy, regex, merging</span></summary>
+            <div class="drawer-body">
+              <label class="label-row"><span>Exclude keywords <span class="muted">(ignore hits inside these)</span></span></label>
+              <div class="row gap">
+                <input id="exclude-input" class="input small grow" type="text" placeholder="e.g. sponsor, intro" onkeydown="handleExcludeKeydown(event)">
+                <button class="btn btn-danger-ghost small" onclick="addExcludeFromInput()">Exclude</button>
+              </div>
+              <div id="exclude-chips" class="chips chips-exclude compact"></div>
+              <div class="options-grid top-gap-s">
+                <label class="check"><input type="checkbox" id="setting-snap-silence" checked><span>Snap cuts to silence</span></label>
+                <label class="check"><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence</span></label>
+                <label class="check"><input type="checkbox" id="setting-case-sensitive"><span>Case-sensitive</span></label>
+                <label class="check"><input type="checkbox" id="setting-regex"><span>Keywords are regex</span></label>
+                <label class="check"><input type="checkbox" id="setting-high-energy"><span>Also cut fast, excited speech</span></label>
+              </div>
+              <div class="sliders top-gap-s">
+                <div class="slider-row">
+                  <label for="setting-fuzzy">Fuzzy tolerance <span id="fuzzy-label" class="mono muted">off</span></label>
+                  <input type="range" id="setting-fuzzy" min="0" max="0.95" step="0.05" value="0">
+                </div>
+                <div class="slider-row">
+                  <label for="setting-merge-gap">Merge hits closer than <span id="merge-gap-label" class="mono muted">0.5s</span></label>
+                  <input type="range" id="setting-merge-gap" min="0" max="5" step="0.1" value="0.5">
+                </div>
+                <div class="slider-row">
+                  <label for="setting-max-clip">Max clip length <span id="max-clip-label" class="mono muted">unlimited</span></label>
+                  <input type="range" id="setting-max-clip" min="0" max="120" step="1" value="0">
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
 
-        <!-- Engine, look & output -->
+        <!-- Output -->
         <div class="card">
           <div class="card-head">
             <div class="card-title-wrap">
               <div class="card-icon icon-purple">⚙</div>
               <div>
                 <h2 class="card-title">Engine, Look &amp; Output</h2>
-                <p class="card-sub">Speech model, framing, transitions, captions and what gets saved.</p>
+                <p class="card-sub">Speech model, framing, captions and where renders go.</p>
               </div>
             </div>
           </div>
@@ -185,16 +172,6 @@
               <label for="setting-model">Speech model</label>
               <select id="setting-model" class="select"></select>
               <div id="model-hint" class="hint"></div>
-            </div>
-            <div class="field">
-              <label for="setting-language">Language</label>
-              <select id="setting-language" class="select">
-                <option value="auto">Auto-detect</option>
-                <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
-                <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option>
-                <option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option>
-                <option value="hi">Hindi</option><option value="ar">Arabic</option><option value="ru">Russian</option>
-              </select>
             </div>
             <div class="field">
               <label for="setting-aspect-ratio">Aspect ratio</label>
@@ -218,27 +195,9 @@
               </div>
             </div>
             <div class="field">
-              <label for="setting-encoder">Encoder</label>
-              <select id="setting-encoder" class="select">
-                <option value="auto">Auto (NVENC → CPU fallback)</option>
-                <option value="hevc_nvenc">NVIDIA HEVC (hevc_nvenc)</option>
-                <option value="h264_nvenc">NVIDIA H.264 (h264_nvenc)</option>
-                <option value="av1_nvenc">NVIDIA AV1 (av1_nvenc)</option>
-                <option value="libx264">CPU H.264 (libx264)</option>
-                <option value="libx265">CPU HEVC (libx265)</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="setting-quality">Quality</label>
-              <select id="setting-quality" class="select">
-                <option value="draft">Draft (fastest)</option>
-                <option value="balanced" selected>Balanced</option>
-                <option value="high">High (slower, larger)</option>
-              </select>
-            </div>
-            <div class="field">
               <label for="setting-subtitle-style">Captions</label>
               <div class="row gap">
+                <label class="check nowrap"><input type="checkbox" id="setting-burn-subtitles"><span>Burn in</span></label>
                 <select id="setting-subtitle-style" class="select grow">
                   <option value="karaoke_amber">Karaoke amber glow</option>
                   <option value="karaoke_cyan">Karaoke cyan glow</option>
@@ -252,60 +211,89 @@
                 </select>
               </div>
             </div>
-            <div class="field">
-              <label for="setting-output-name">Master file name <span class="muted">(optional)</span></label>
-              <input id="setting-output-name" class="input" type="text" placeholder="FINAL_BATCH_SUPERCUT">
-            </div>
           </div>
 
-          <div class="options-grid top-gap">
-            <label class="check"><input type="checkbox" id="setting-burn-subtitles"><span>Burn captions into video</span></label>
-            <label class="check"><input type="checkbox" id="setting-loudness" checked><span>Normalize loudness (EBU R128)</span></label>
-            <label class="check"><input type="checkbox" id="setting-fast-seek" checked><span>Fast seek rendering</span></label>
-            <label class="check"><input type="checkbox" id="setting-open-folder"><span>Open folder when done</span></label>
-          </div>
-
-          <div class="divider"></div>
-          <div class="label-row"><span>Outputs</span></div>
-          <div class="options-grid">
-            <label class="check"><input type="checkbox" id="setting-batch-stitch" checked><span>Master combined video</span></label>
-            <label class="check"><input type="checkbox" id="setting-per-video-stitch" checked><span>Per-video highlight reels</span></label>
-            <label class="check"><input type="checkbox" id="setting-individual-clips"><span>Individual clip files</span></label>
-            <label class="check"><input type="checkbox" id="setting-thumbnails"><span>Clip thumbnails</span></label>
-            <label class="check"><input type="checkbox" id="setting-contact-sheet"><span>Contact sheet image</span></label>
-          </div>
-          <div class="label-row top-gap"><span>Sidecar files</span></div>
-          <div class="options-grid">
-            <label class="check"><input type="checkbox" id="setting-export-srt" checked><span>Subtitles (.srt)</span></label>
-            <label class="check"><input type="checkbox" id="setting-export-vtt"><span>WebVTT (.vtt)</span></label>
-            <label class="check"><input type="checkbox" id="setting-export-ass"><span>Karaoke (.ass)</span></label>
-            <label class="check"><input type="checkbox" id="setting-export-transcript"><span>Full transcript (.txt/.srt)</span></label>
-            <label class="check"><input type="checkbox" id="setting-export-fcpxml"><span>Premiere / FCP XML</span></label>
-            <label class="check"><input type="checkbox" id="setting-export-edl"><span>DaVinci EDL</span></label>
-          </div>
-
-          <div class="divider"></div>
-          <label for="output-dir" class="label-row"><span>Output folder</span></label>
+          <label for="output-dir" class="label-row top-gap-s"><span>Output folder</span></label>
           <div class="row gap">
             <input id="output-dir" class="input mono grow" type="text" spellcheck="false" placeholder="Where renders are saved">
             <button class="btn" onclick="browseOutput()">Browse…</button>
             <button class="btn btn-ghost" onclick="openOutputFolder()" title="Open in Explorer">Open</button>
           </div>
+
+          <details class="drawer" id="drawer-output">
+            <summary>More output options <span class="muted">encoder, quality, files to save, sidecars</span></summary>
+            <div class="drawer-body">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="setting-encoder">Encoder</label>
+                  <select id="setting-encoder" class="select">
+                    <option value="auto">Auto (NVENC → CPU fallback)</option>
+                    <option value="h264_nvenc">NVIDIA H.264 (h264_nvenc)</option>
+                    <option value="hevc_nvenc">NVIDIA HEVC (hevc_nvenc)</option>
+                    <option value="av1_nvenc">NVIDIA AV1 (av1_nvenc)</option>
+                    <option value="libx264">CPU H.264 (libx264)</option>
+                    <option value="libx265">CPU HEVC (libx265)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="setting-quality">Quality</label>
+                  <select id="setting-quality" class="select">
+                    <option value="draft">Draft (fastest)</option>
+                    <option value="balanced" selected>Balanced</option>
+                    <option value="high">High (slower, larger)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="setting-language">Spoken language</label>
+                  <select id="setting-language" class="select">
+                    <option value="auto">Auto-detect</option>
+                    <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
+                    <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option>
+                    <option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option>
+                    <option value="hi">Hindi</option><option value="ar">Arabic</option><option value="ru">Russian</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="setting-output-name">Master file name <span class="muted">(optional)</span></label>
+                  <input id="setting-output-name" class="input" type="text" placeholder="FINAL_BATCH_SUPERCUT">
+                </div>
+              </div>
+              <div class="options-grid top-gap-s">
+                <label class="check"><input type="checkbox" id="setting-loudness" checked><span>Normalize loudness (EBU R128)</span></label>
+                <label class="check"><input type="checkbox" id="setting-fast-seek" checked><span>Fast seek rendering</span></label>
+                <label class="check"><input type="checkbox" id="setting-open-folder"><span>Open folder when done</span></label>
+              </div>
+              <div class="label-row top-gap-s"><span>Files to save</span></div>
+              <div class="options-grid">
+                <label class="check"><input type="checkbox" id="setting-batch-stitch" checked><span>Master combined video</span></label>
+                <label class="check"><input type="checkbox" id="setting-per-video-stitch" checked><span>Per-video highlight reels</span></label>
+                <label class="check"><input type="checkbox" id="setting-individual-clips"><span>Individual clip files</span></label>
+                <label class="check"><input type="checkbox" id="setting-thumbnails"><span>Clip thumbnails</span></label>
+                <label class="check"><input type="checkbox" id="setting-contact-sheet"><span>Contact sheet image</span></label>
+              </div>
+              <div class="label-row top-gap-s"><span>Sidecar files</span></div>
+              <div class="options-grid">
+                <label class="check"><input type="checkbox" id="setting-export-srt" checked><span>Subtitles (.srt)</span></label>
+                <label class="check"><input type="checkbox" id="setting-export-vtt"><span>WebVTT (.vtt)</span></label>
+                <label class="check"><input type="checkbox" id="setting-export-ass"><span>Karaoke (.ass)</span></label>
+                <label class="check"><input type="checkbox" id="setting-export-transcript"><span>Full transcript (.txt/.srt)</span></label>
+                <label class="check"><input type="checkbox" id="setting-export-fcpxml"><span>Premiere / FCP XML</span></label>
+                <label class="check"><input type="checkbox" id="setting-export-edl"><span>DaVinci EDL</span></label>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
       <!-- Action station -->
       <div class="card action-station">
         <div class="action-buttons">
-          <button id="btn-start-stitching" class="btn btn-hero" onclick="trigger1ClickSuperCut()">
-            <span class="hero-icon">▶</span><span id="btn-start-text">Start SuperCut</span>
-            <span class="hero-sub">transcribe → find → render</span>
+          <button id="btn-run-analysis" class="btn btn-hero" onclick="triggerAnalyze()" title="Transcribe, find the keyword hits, then pick and trim clips before rendering">
+            <span class="hero-icon">🔍</span><span id="btn-run-text">Analyze &amp; Review First</span>
+            <span class="hero-sub">transcribe → find hits → you curate → render</span>
           </button>
-          <button id="btn-run-analysis" class="btn btn-secondary tall" onclick="triggerAnalyze()" title="Transcribe and inspect each clip before rendering">
-            🔍 <span id="btn-run-text">Analyze &amp; Review First</span>
-          </button>
-          <button id="btn-stitch-folder" class="btn btn-secondary tall" onclick="triggerStitchFolderOnly()" title="Join every video in the folder, no transcription">
-            🎬 <span id="btn-folder-text">Stitch Folder Only</span>
+          <button id="btn-start-stitching" class="btn btn-secondary tall" onclick="trigger1ClickSuperCut()" title="Do everything in one go with no review step">
+            ▶ <span id="btn-start-text">Start SuperCut (no review)</span>
           </button>
           <button id="btn-cancel-pipeline" class="btn btn-danger tall hidden" onclick="cancelJob()">■ Stop</button>
         </div>
@@ -342,16 +330,19 @@
       </div>
 
       <!-- Live log -->
-      <div class="card log-card">
-        <div class="card-head compact">
-          <h3 class="card-title small-title">Live log</h3>
-          <div class="row gap-s">
-            <label class="check small"><input type="checkbox" id="log-autoscroll" checked><span>Auto-scroll</span></label>
-            <button class="btn btn-ghost small" onclick="clearLog()">Clear</button>
+      <details class="drawer card log-card" id="drawer-log">
+        <summary>Live log <span id="log-summary-hint" class="muted"></span></summary>
+        <div class="drawer-body">
+          <div class="row between small">
+            <span></span>
+            <div class="row gap-s">
+              <label class="check small"><input type="checkbox" id="log-autoscroll" checked><span>Auto-scroll</span></label>
+              <button class="btn btn-ghost small" onclick="clearLog()">Clear</button>
+            </div>
           </div>
+          <div id="log-console" class="log-console mono"></div>
         </div>
-        <div id="log-console" class="log-console mono"></div>
-      </div>
+      </details>
     </section>
 
     <!-- ================= TAB 2: REVIEWER ================= -->
@@ -425,7 +416,7 @@
           <div class="card-head">
             <div>
               <h2 class="card-title">Detected Clips</h2>
-              <p class="card-sub">Review, audition and curate what gets stitched.</p>
+              <p class="card-sub" id="clips-summary">Review, audition and curate what gets stitched.</p>
             </div>
             <div class="row gap-s">
               <button class="btn small" onclick="batchToggleClips(true)">All</button>
@@ -449,7 +440,7 @@
 
           <div class="table-wrap">
             <table class="clips-table">
-              <thead><tr><th class="w-40">Use</th><th class="w-40">#</th><th>Keyword</th><th>Window</th><th>Length</th><th>Matched</th><th class="right">Actions</th></tr></thead>
+              <thead><tr><th class="w-40">Use</th><th class="w-40">#</th><th>Keyword · hits</th><th>Window</th><th>Length</th><th>Matched</th><th class="right">Actions</th></tr></thead>
               <tbody id="clips-tbody"><tr><td colspan="7" class="empty">No clips detected yet. Run analysis in Setup to populate this cockpit.</td></tr></tbody>
             </table>
           </div>
@@ -471,7 +462,7 @@
         <div class="card-head">
           <div>
             <h2 class="card-title">Transcript Inspector</h2>
-            <p class="card-sub">Verbatim speech with word timings. Click a line to seek the reviewer; use “+ clip” to cut a segment.</p>
+            <p class="card-sub">Verbatim speech with word timings. Highlighted words are the engine's keyword hits. Click a line to seek; “+ clip” cuts a segment.</p>
           </div>
           <div class="row gap-s wrap">
             <select id="transcript-video-select" class="select small" onchange="renderTranscriptForSelectedVideo()"><option value="">No video loaded</option></select>
@@ -483,8 +474,8 @@
         </div>
         <div class="row gap">
           <input id="transcript-search-input" class="input grow" type="text" placeholder="Search within transcript…" oninput="filterTranscriptLines()">
-          <span id="transcript-match-count" class="mono small muted">0 matches</span>
-          <span id="transcript-meta" class="mono small muted"></span>
+          <span id="transcript-match-count" class="mono small muted nowrap">0 lines</span>
+          <span id="transcript-meta" class="mono small muted nowrap"></span>
         </div>
         <div id="transcript-container" class="transcript">
           <div class="empty">No transcripts loaded yet. Run analysis to transcribe your media.</div>
@@ -537,7 +528,50 @@
         <div id="job-history" class="history"></div>
       </div>
     </section>
+
+    <!-- ================= TAB 5: TOOLS ================= -->
+    <section id="tab-tools" class="tab-content hidden">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-wrap">
+              <div class="card-icon icon-green">🎬</div>
+              <div>
+                <h2 class="card-title">Stitch Folder Only</h2>
+                <p class="card-sub">Join every video in a folder into one file, in name order. No transcription, no keywords. Uses the aspect ratio, encoder and output folder from Setup.</p>
+              </div>
+            </div>
+          </div>
+          <div class="row gap">
+            <input id="tools-folder-path" class="input mono grow" type="text" spellcheck="false" placeholder="Folder of videos (defaults to the Setup source folder)">
+            <button class="btn" onclick="browseToolsFolder()">Browse…</button>
+          </div>
+          <div class="row gap">
+            <button id="btn-stitch-folder" class="btn btn-primary" onclick="triggerStitchFolderOnly()">🎬 <span id="btn-folder-text">Stitch folder</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-wrap">
+              <div class="card-icon icon-purple">🧹</div>
+              <div>
+                <h2 class="card-title">Maintenance</h2>
+                <p class="card-sub">Caches, logs and diagnostics.</p>
+              </div>
+            </div>
+          </div>
+          <div class="row gap wrap">
+            <button class="btn" onclick="openSystemModal()">System &amp; diagnostics</button>
+            <button class="btn btn-danger-ghost" onclick="clearTranscriptCache()" title="Transcripts are cached per file so re-running with new keywords is instant. Clear to force re-transcription.">Clear transcript cache</button>
+            <button class="btn" onclick="openPath(systemInfo && systemInfo.app ? systemInfo.app.logs_dir : '')">Open logs folder</button>
+            <button class="btn" onclick="openPath(systemInfo && systemInfo.app ? systemInfo.app.data_dir : '')">Open data folder</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
+  </div><!-- /app-scaled -->
 
   <!-- ================= MODALS ================= -->
   <div id="modal-backdrop" class="modal-backdrop hidden" onclick="closeModals()"></div>
@@ -558,7 +592,7 @@
       <div><kbd>N</kbd> / <kbd>P</kbd> Next / previous clip</div><div><kbd>Enter</kbd> Play active clip range</div>
       <div><kbd>I</kbd> / <kbd>O</kbd> Set IN / OUT at playhead</div><div><kbd>[</kbd> / <kbd>]</kbd> Nudge IN earlier / OUT later</div>
       <div><kbd>Shift+[</kbd> / <kbd>Shift+]</kbd> Nudge IN later / OUT earlier</div><div><kbd>Home</kbd> / <kbd>End</kbd> Jump to IN / OUT</div>
-      <div><kbd>Delete</kbd> Remove active clip</div><div><kbd>1</kbd>–<kbd>4</kbd> Switch tabs</div>
+      <div><kbd>Delete</kbd> Remove active clip</div><div><kbd>1</kbd>–<kbd>5</kbd> Switch tabs</div>
       <div><kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>Ctrl</kbd>+<kbd>−</kbd> UI bigger / smaller</div><div><kbd>Ctrl</kbd>+<kbd>0</kbd> Reset UI size</div>
       <div><kbd>Esc</kbd> Stop job / close dialogs</div><div><kbd>?</kbd> This help</div>
     </div>

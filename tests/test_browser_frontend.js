@@ -317,10 +317,11 @@ async function runBrowserTests() {
     assert(document.querySelectorAll('.transcript-line .w.hit').length === 1, 'Keyword word highlighted');
     document.getElementById('transcript-search-input').value = 'physics';
     window.filterTranscriptLines();
-    assert(document.getElementById('transcript-match-count').textContent === '1 match', 'Search filters transcript');
+    assert(document.getElementById('transcript-match-count').textContent === '1 line match', 'Search filters transcript');
     assert(document.querySelectorAll('.transcript-line:not(.hidden)').length === 1, 'Non-matching line hidden');
     document.getElementById('transcript-search-input').value = '';
     window.filterTranscriptLines();
+    assert(document.getElementById('transcript-match-count').textContent === '2 lines · 1 keyword hit', 'Empty search shows line and hit counts');
     lines[1].click();
     await tick(30);
     assert(studioPlayer.currentTime === 10, 'Clicking a line seeks the player');
@@ -352,16 +353,6 @@ async function runBrowserTests() {
     assert(document.getElementById('telemetry-stage').textContent === 'CANCELLED', 'Cancel sets CANCELLED stage');
     assert(document.getElementById('btn-cancel').classList.contains('hidden'), 'Stop hidden after cancel');
     pass('SSE error and cancelled events reset the running UI with feedback');
-
-    // Discovery suggestions
-    window.__sse.emit('discovered', { keywords: [{ keyword: 'machine learning', score: 4.2 }, { keyword: 'rockets', score: 3.1 }], stats_count: 1 });
-    await tick(30);
-    assert(!document.getElementById('discovered-panel').classList.contains('hidden'), 'Discovered panel visible');
-    const pills = document.querySelectorAll('#discovered-pills .pill');
-    assert(pills.length === 3, 'Two suggestions + add all');
-    pills[0].click();
-    assert(Array.from(document.querySelectorAll('#keyword-chips .chip span')).some((s) => s.textContent.trim() === 'machine learning'), 'Clicking a suggestion adds a keyword');
-    pass('Auto-discovered keywords render as clickable suggestions');
 
     // Modals
     window.openShortcutsModal();

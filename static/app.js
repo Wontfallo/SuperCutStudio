@@ -136,22 +136,35 @@ function loadUiScale() {
   try { saved = parseFloat(localStorage.getItem('supercut.uiScale')); } catch (_) {}
   if (saved && saved >= UI_SCALE_MIN && saved <= UI_SCALE_MAX) uiScale = saved;
   else if (window.innerWidth >= 2200 || (window.devicePixelRatio || 1) >= 1.75) uiScale = 1.25;
-  applyUiScale();
+  const range = $('ui-scale-range');
+  if (range) {
+    range.addEventListener('input', () => { uiScale = parseInt(range.value, 10) / 100; applyUiScale(false); });
+    range.addEventListener('change', () => { uiScale = parseInt(range.value, 10) / 100; applyUiScale(true); });
+  }
+  // Fullscreen video must not inherit the zoom, or it renders cropped without controls.
+  document.addEventListener('fullscreenchange', () => {
+    const scaled = $('app-scaled');
+    if (!scaled) return;
+    scaled.style.zoom = document.fullscreenElement ? '1' : String(uiScale);
+  });
+  applyUiScale(false);
 }
 
-function applyUiScale() {
+function applyUiScale(persist = true) {
   uiScale = Math.round(Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, uiScale)) * 100) / 100;
-  document.documentElement.style.zoom = String(uiScale);
+  const scaled = $('app-scaled');
+  if (scaled && !document.fullscreenElement) scaled.style.zoom = String(uiScale);
   const label = $('ui-scale-label');
   if (label) label.textContent = `${Math.round(uiScale * 100)}%`;
-  try { localStorage.setItem('supercut.uiScale', String(uiScale)); } catch (_) {}
+  const range = $('ui-scale-range');
+  if (range && parseInt(range.value, 10) !== Math.round(uiScale * 100)) range.value = String(Math.round(uiScale * 100));
+  if (persist) { try { localStorage.setItem('supercut.uiScale', String(uiScale)); } catch (_) {} }
   if (typeof drawWaveform === 'function') requestAnimationFrame(drawWaveform);
 }
 
 function changeUiScale(delta) {
   uiScale = delta === 0 ? 1.0 : uiScale + delta;
-  applyUiScale();
-  showToast(`UI size ${Math.round(uiScale * 100)}%`, 'info', 900);
+  applyUiScale(true);
 }
 window.changeUiScale = changeUiScale;
 window.applyUiScale = applyUiScale;
@@ -311,7 +324,6 @@ const CONFIG_BINDINGS = [
   ['setting-sentence-mode', 'sentence_mode', 'bool'],
   ['setting-snap-silence', 'snap_to_silence', 'bool'],
   ['setting-high-energy', 'high_energy', 'bool'],
-  ['setting-auto-keywords', 'auto_keywords', 'bool'],
   ['setting-fuzzy', 'fuzzy_threshold', 'number'],
   ['setting-pre-pad', 'pre_pad', 'number'],
   ['setting-post-pad', 'post_pad', 'number'],
@@ -497,12 +509,13 @@ function renderScannedFiles(data) {
 function initDropZone() {
   const dropZone = $('drop-zone');
   const fileUploader = $('file-uploader');
+  const card = $('source-card') || dropZone;
   dropZone.addEventListener('click', (e) => { if (e.target !== fileUploader) fileUploader.click(); });
-  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', (e) => {
+  card.addEventListener('dragover', (e) => { e.preventDefault(); card.classList.add('drag-over'); });
+  card.addEventListener('dragleave', (e) => { if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over'); });
+  card.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('drag-over');
+    card.classList.remove('drag-over');
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) uploadMediaFile(e.dataTransfer.files[0]);
   });
 }
@@ -514,7 +527,7 @@ function handleFileUpload(event) {
 window.handleFileUpload = handleFileUpload;
 
 async function uploadMediaFile(file) {
-  const dropZone = $('drop-zone');
+  const dropZone = $('source-card') || $('drop-zone');
   const formData = new FormData();
   formData.append('file', file);
   dropZone.classList.add('uploading');
@@ -545,7 +558,7 @@ function renderKeywordChips() {
   const list = appConfig.keywords || [];
   container.innerHTML = '';
   if (list.length === 0) {
-    container.innerHTML = '<span class="placeholder">No keywords yet. Type one above, or use Auto-discover.</span>';
+    container.innerHTML = '<span class="placeholder">No keywords yet. Type one above and press Enter.</span>';
     return;
   }
   list.forEach((kw, idx) => {
@@ -622,26 +635,6 @@ window.handleExcludeKeydown = handleExcludeKeydown;
 function removeExclude(idx) { appConfig.exclude_keywords.splice(idx, 1); renderExcludeChips(); scheduleSave(); }
 window.removeExclude = removeExclude;
 
-function renderDiscovered(keywords) {
-  const panel = $('discovered-panel');
-  const pills = $('discovered-pills');
-  pills.innerHTML = '';
-  if (!keywords || keywords.length === 0) { panel.classList.add('hidden'); return; }
-  panel.classList.remove('hidden');
-  for (const k of keywords) {
-    const b = document.createElement('button');
-    b.className = 'pill';
-    b.innerHTML = `+ ${escapeHtml(k.keyword)}<span class="score">${(k.score || 0).toFixed(1)}</span>`;
-    b.onclick = () => { addKeyword(k.keyword); b.remove(); };
-    pills.appendChild(b);
-  }
-  const all = document.createElement('button');
-  all.className = 'pill';
-  all.textContent = 'Add all';
-  all.onclick = () => { keywords.forEach((k) => addKeyword(k.keyword)); panel.classList.add('hidden'); };
-  pills.appendChild(all);
-}
-
 // ---------------------------------------------------------------------------
 // Jobs
 // ---------------------------------------------------------------------------
@@ -652,7 +645,7 @@ function setJobRunning(running, label) {
   const cancelPipe = $('btn-cancel-pipeline');
   cancelBtn.classList.toggle('hidden', !running);
   cancelPipe.classList.toggle('hidden', !running);
-  ['btn-start-stitching', 'btn-run-analysis', 'btn-stitch-folder', 'btn-quick-analyze', 'btn-discover'].forEach((id) => {
+  ['btn-start-stitching', 'btn-run-analysis', 'btn-stitch-folder'].forEach((id) => {
     const b = $(id);
     if (b) b.disabled = running;
   });
@@ -680,8 +673,8 @@ async function startJob(url, body, label, opts = {}) {
   if (opts.needInput !== false && !cfg.input_path) {
     showToast('Set an input folder or video file first.', 'warning'); switchTab('setup'); $('input-path').focus(); return false;
   }
-  if (opts.needKeywords && (!cfg.keywords || cfg.keywords.length === 0) && !cfg.auto_keywords && !cfg.high_energy) {
-    showToast('Add at least one keyword (or enable auto-discovery).', 'warning'); switchTab('setup'); $('keyword-input').focus(); return false;
+  if (opts.needKeywords && (!cfg.keywords || cfg.keywords.length === 0) && !cfg.high_energy) {
+    showToast('Add at least one keyword first.', 'warning'); switchTab('setup'); $('keyword-input').focus(); return false;
   }
   try {
     await postJson(url, Object.assign({ config: cfg }, body || {}));
@@ -717,19 +710,22 @@ window.triggerAnalyze = triggerAnalyze;
 
 async function triggerStitchFolderOnly() {
   const cfg = collectCurrentConfig();
-  if (await startJob('/api/stitch-folder-only', { input_path: cfg.input_path }, 'Normalizing & joining folder…')) {
+  const toolsPath = sanitizePath(($('tools-folder-path') || {}).value || '');
+  const folder = toolsPath || cfg.input_path;
+  if (!folder) { showToast('Pick a folder of videos first.', 'warning'); return; }
+  if (await startJob('/api/stitch-folder-only', { input_path: folder }, 'Normalizing & joining folder…', { needInput: false })) {
     showToast('Folder stitch started.', 'info', 2500);
   }
 }
 window.triggerStitchFolderOnly = triggerStitchFolderOnly;
 
-async function triggerDiscover() {
-  const cfg = collectCurrentConfig();
-  if (await startJob('/api/discover', { input_path: cfg.input_path, top_n: 15 }, 'Transcribing to discover keywords…')) {
-    showToast('Listening for the strongest topics…', 'info', 2500);
-  }
+async function browseToolsFolder() {
+  try {
+    const r = await postJson('/api/pick', { kind: 'folder', title: 'Folder of videos to join', initial: $('tools-folder-path').value || $('input-path').value });
+    if (r.status === 'ok' && r.path) $('tools-folder-path').value = r.path;
+  } catch (err) { showToast('Picker unavailable: ' + err.message, 'warning'); }
 }
-window.triggerDiscover = triggerDiscover;
+window.browseToolsFolder = browseToolsFolder;
 
 async function triggerRender() {
   if (jobRunning) { showToast('A job is already running.', 'warning'); return; }
@@ -756,9 +752,8 @@ async function cancelJob() {
 window.cancelJob = cancelJob;
 
 function resetJobButtons() {
-  $('btn-start-text').textContent = 'Start SuperCut';
+  $('btn-start-text').textContent = 'Start SuperCut (no review)';
   $('btn-run-text').textContent = 'Analyze & Review First';
-  $('btn-quick-analyze').textContent = 'Analyze Media';
 }
 
 function clearResultCards() {
@@ -786,6 +781,8 @@ function updateTelemetry(pct, msg, stage, elapsed, eta) {
 function appendLog(entry) {
   const box = $('log-console');
   if (!box) return;
+  const hint = $('log-summary-hint');
+  if (hint && entry.text) hint.textContent = '· ' + String(entry.text).slice(0, 90);
   const line = document.createElement('div');
   line.className = `log-line log-${entry.level || 'info'}`;
   line.innerHTML = `<span class="t">${escapeHtml(entry.time || '')}</span><span>${escapeHtml(entry.text || '')}</span>`;
@@ -852,7 +849,7 @@ function initSSE() {
     if (!d.silent) {
       switchTab('reviewer');
       if (d.total_clips > 0) showToast(`Analysis complete: ${d.total_clips} clip(s) from ${d.total_hits} hit(s) across ${d.stats_count} video(s).`, 'success', 5000);
-      else showToast('Analysis finished but no keyword hits were found. Try other keywords, fuzzy matching, or Auto-discover.', 'warning', 7000);
+      else showToast('Analysis finished but no keyword hits were found. Try other keywords or fuzzy matching.', 'warning', 7000);
       if (d.failed && d.failed.length) showToast('Failed: ' + d.failed.join(', '), 'error', 6000);
     }
   });
@@ -865,16 +862,6 @@ function initSSE() {
     switchTab('export');
     showToast('SuperCut rendering complete. Master video ready.', 'success', 5000);
     loadJobHistory();
-  });
-  eventSource.addEventListener('discovered', (e) => {
-    const d = parse(e);
-    setJobRunning(false, `Discovered ${d.keywords.length} keyword(s)`);
-    resetJobButtons();
-    renderDiscovered(d.keywords);
-    loadTranscripts();
-    loadClips();
-    switchTab('setup');
-    showToast(`Discovered ${d.keywords.length} keyword(s). Click a suggestion to add it.`, 'success', 5000);
   });
   eventSource.addEventListener('cancelled', () => {
     setJobRunning(false, 'Stopped');
@@ -906,7 +893,7 @@ function initSSE() {
 function applyStatusSnapshot(d) {
   if (!d) return;
   updateTelemetry(d.pct, d.msg, d.stage, d.elapsed, null);
-  const running = ['analyzing', 'rendering', 'stitching', 'discovering'].includes(d.status);
+  const running = ['analyzing', 'rendering', 'stitching'].includes(d.status);
   if (running && !jobRunning) { jobStartedAt = Date.now() - (d.elapsed || 0) * 1000; setJobRunning(true, d.msg); }
   if (!running && jobRunning) { setJobRunning(false, d.stage || 'Ready'); resetJobButtons(); }
   if (d.has_result) loadLatestResult();
@@ -926,6 +913,18 @@ async function loadClips() {
     clipVideos = data.videos || [];
     window.detectedClips = detectedClips;
     $('badge-clip-count').textContent = data.count;
+    const summary = $('clips-summary');
+    if (summary) {
+      const hits = data.total_hits || 0;
+      const b = data.boundaries || {};
+      if (data.count > 0 && hits > data.count) {
+        summary.textContent = `${hits} keyword hits merged into ${data.count} clip(s): hits closer together than the padding (${(b.pre_pad ?? 1).toFixed(1)}s before / ${(b.post_pad ?? 1).toFixed(1)}s after) are joined into one clip. Lower the padding in Setup for more, shorter clips.`;
+      } else if (data.count > 0) {
+        summary.textContent = `${hits} keyword hit(s) → ${data.count} clip(s). Review, audition and curate what gets stitched.`;
+      } else {
+        summary.textContent = 'Review, audition and curate what gets stitched.';
+      }
+    }
     $('curated-count').textContent = data.selected_count;
     $('curated-footage').textContent = formatDuration(data.selected_footage || 0);
     if (activePlayingClip) {
@@ -1009,22 +1008,46 @@ function renderClipsTable() {
     tr.id = `clip-row-${globalIdx}`;
     const badgeClass = clip.is_high_energy ? 'energy' : (clip.manual ? 'manual' : '');
     const conf = clip.confidence != null ? clip.confidence : 1;
+    const hitCount = (clip.hits || []).length;
+    const kws = (clip.keywords && clip.keywords.length ? clip.keywords : [clip.primary_keyword]);
+    const kwLabel = clip.custom_title || kws[0];
+    const extraKws = kws.length > 1 ? `<span class="kw-more" title="${escapeHtml(kws.join(', '))}">+${kws.length - 1} more</span>` : '';
+    tr.dataset.idx = String(globalIdx);
     tr.innerHTML = `
-      <td onclick="event.stopPropagation()"><input type="checkbox" ${clip.selected ? 'checked' : ''} onchange="toggleClipSelected('${escapeHtml(clip.video_path).replace(/'/g, '&#39;')}', ${clip.clip_index}, this.checked)"></td>
+      <td class="stop"><input type="checkbox" class="clip-use" ${clip.selected ? 'checked' : ''} data-idx="${globalIdx}"></td>
       <td class="mono muted">${clip.clip_index}</td>
-      <td><span class="kw-badge ${badgeClass}">${escapeHtml(clip.custom_title || clip.primary_keyword)}</span>${multiVideo ? `<div class="tiny dim ellipsis" style="max-width:150px" title="${escapeHtml(clip.video_filename)}">${escapeHtml(clip.video_filename)}</div>` : ''}</td>
+      <td><span class="kw-badge ${badgeClass}">${escapeHtml(kwLabel)}</span>${hitCount > 1 ? `<span class="kw-hits" title="${hitCount} keyword hits inside this clip">×${hitCount}</span>` : ''}${extraKws}${multiVideo ? `<div class="tiny dim ellipsis" style="max-width:150px" title="${escapeHtml(clip.video_filename)}">${escapeHtml(clip.video_filename)}</div>` : ''}</td>
       <td class="mono">${formatShort(clip.start)} → ${formatShort(clip.end)}</td>
       <td class="mono text-green">${clip.duration.toFixed(2)}s</td>
       <td><span class="matched" title="${escapeHtml(clip.matched_text)}">${escapeHtml(clip.matched_text || '')}</span> <span class="conf ${conf < 0.6 ? 'low' : ''}" title="ASR confidence">${Math.round(conf * 100)}%</span></td>
-      <td class="right" onclick="event.stopPropagation()">
-        <button class="btn small" onclick="previewClip(${globalIdx})">▶ Audition</button>
-        <button class="btn btn-ghost small" title="Delete clip" onclick="deleteClip(${globalIdx})">✕</button>
+      <td class="right stop">
+        <button class="btn small clip-audition" data-idx="${globalIdx}">▶ Audition</button>
+        <button class="btn btn-ghost small clip-delete" title="Delete clip" data-idx="${globalIdx}">✕</button>
       </td>`;
-    tr.onclick = () => previewClip(globalIdx);
     tbody.appendChild(tr);
   }
 }
 window.renderClipsTable = renderClipsTable;
+
+function initClipTableHandlers() {
+  const tbody = $('clips-tbody');
+  if (!tbody) return;
+  tbody.addEventListener('click', (e) => {
+    const audition = e.target.closest('.clip-audition');
+    if (audition) { e.stopPropagation(); previewClip(parseInt(audition.dataset.idx, 10)); return; }
+    const del = e.target.closest('.clip-delete');
+    if (del) { e.stopPropagation(); deleteClip(parseInt(del.dataset.idx, 10)); return; }
+    if (e.target.closest('.stop')) return;
+    const row = e.target.closest('tr.clip-row');
+    if (row && row.dataset.idx !== undefined) previewClip(parseInt(row.dataset.idx, 10));
+  });
+  tbody.addEventListener('change', (e) => {
+    const cb = e.target.closest('.clip-use');
+    if (!cb) return;
+    const clip = detectedClips[parseInt(cb.dataset.idx, 10)];
+    if (clip) toggleClipSelected(clip.video_path, clip.clip_index, cb.checked);
+  });
+}
 
 function showAnalyzingStateInReviewer() {
   const tbody = $('clips-tbody');
@@ -1442,7 +1465,7 @@ function initKeyboardShortcuts() {
       return;
     }
     if (key === '?') { e.preventDefault(); openShortcutsModal(); return; }
-    if (['1', '2', '3', '4'].includes(key)) { switchTab(['setup', 'reviewer', 'transcript', 'export'][parseInt(key, 10) - 1]); return; }
+    if (['1', '2', '3', '4', '5'].includes(key)) { switchTab(['setup', 'reviewer', 'transcript', 'export', 'tools'][parseInt(key, 10) - 1]); return; }
 
     const player = $('studio-video-player');
     if (!player) return;
@@ -1506,7 +1529,7 @@ window.loadTranscripts = loadTranscripts;
 function keywordMatcher() {
   const kws = (appConfig.keywords || []).map((k) => k.toLowerCase().trim()).filter(Boolean);
   const singles = new Set(kws.filter((k) => !k.includes(' ')));
-  const clean = (w) => w.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+  const clean = (w) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
   return (wordText) => {
     const c = clean(wordText);
     if (!c) return false;
@@ -1530,7 +1553,10 @@ function renderTranscriptForSelectedVideo() {
     return;
   }
   $('transcript-meta').textContent = `${t.model_name || 'asr'} · ${t.language} · ${t.word_count} words${t.cached ? ' · cached' : ''}`;
-  const isHit = keywordMatcher();
+  const spans = Array.isArray(t.hits) ? t.hits : null;
+  const fallback = keywordMatcher();
+  // Prefer the engine's own hit spans so the page shows exactly what matched (sister's, sisters, Sister?).
+  const isHit = (w) => spans ? spans.some((h) => w.start >= h.start - 0.02 && w.end <= h.end + 0.02) : fallback(w.text);
   const frag = document.createDocumentFragment();
   t.segments.forEach((seg, sIdx) => {
     const line = document.createElement('div');
@@ -1543,7 +1569,7 @@ function renderTranscriptForSelectedVideo() {
     if (seg.words && seg.words.length) {
       body = seg.words.map((w) => {
         const cls = ['w'];
-        if (isHit(w.text)) cls.push('hit');
+        if (isHit(w)) cls.push('hit');
         if (w.confidence != null && w.confidence < 0.5) cls.push('low');
         return `<span class="${cls.join(' ')}" data-t="${w.start}" title="${w.start.toFixed(2)}s · ${Math.round((w.confidence || 1) * 100)}%">${escapeHtml(w.text)}</span>`;
       }).join(' ');
@@ -1579,6 +1605,7 @@ function filterTranscriptLines() {
   const query = ($('transcript-search-input').value || '').trim().toLowerCase();
   const lines = document.querySelectorAll('.transcript-line');
   let matches = 0;
+  const hitWords = document.querySelectorAll('.transcript-line .w.hit').length;
   lines.forEach((l) => {
     const text = l.dataset.text || '';
     const show = !query || text.includes(query);
@@ -1589,7 +1616,9 @@ function filterTranscriptLines() {
       l.querySelectorAll('.w').forEach((w) => { if (w.textContent.toLowerCase().includes(query)) w.classList.add('search'); });
     }
   });
-  $('transcript-match-count').textContent = `${matches} match${matches === 1 ? '' : 'es'}`;
+  $('transcript-match-count').textContent = query
+    ? `${matches} line${matches === 1 ? '' : 's'} match`
+    : `${lines.length} lines · ${hitWords} keyword hit${hitWords === 1 ? '' : 's'}`;
 }
 window.filterTranscriptLines = filterTranscriptLines;
 
@@ -1681,9 +1710,9 @@ async function loadLatestResult() {
         <div class="kind ${a.kind}">${ARTIFACT_LABEL[a.kind] || 'FILE'}</div>
         <div class="info"><div class="n" title="${escapeHtml(a.path)}">${escapeHtml(a.label || a.filename)}</div><div class="m">${escapeHtml(a.filename)} · ${formatBytes(a.size_bytes)}</div></div>
         <div class="acts">
-          ${isMedia ? `<button class="btn btn-ghost small" title="Preview" onclick="previewArtifact('${escapeHtml(a.path).replace(/'/g, '&#39;')}')">▶</button>` : ''}
+          ${isMedia ? `<button class="btn btn-ghost small act-preview" title="Preview" data-path="${escapeHtml(a.path)}">▶</button>` : ''}
           <a class="btn btn-ghost small" title="Download" href="/api/download?path=${encodeURIComponent(a.path)}" download>⤓</a>
-          <button class="btn btn-ghost small" title="Show in folder" onclick="openPath('${escapeHtml(a.path).replace(/'/g, '&#39;')}')">📁</button>
+          <button class="btn btn-ghost small act-open" title="Show in folder" data-path="${escapeHtml(a.path)}">📁</button>
         </div>`;
       list.appendChild(el);
     }
@@ -1694,6 +1723,15 @@ async function loadLatestResult() {
   }
 }
 window.loadLatestResult = loadLatestResult;
+
+function initPathActionHandlers() {
+  document.addEventListener('click', (e) => {
+    const open = e.target.closest('.act-open');
+    if (open && open.dataset.path) { e.preventDefault(); openPath(open.dataset.path); return; }
+    const prev = e.target.closest('.act-preview');
+    if (prev && prev.dataset.path) { e.preventDefault(); previewArtifact(prev.dataset.path); }
+  });
+}
 
 function previewArtifact(path) {
   const p = $('final-video-player');
@@ -1710,7 +1748,7 @@ async function loadJobHistory() {
     if (!d.jobs || d.jobs.length === 0) { box.innerHTML = '<div class="empty">No jobs yet this session.</div>'; return; }
     box.innerHTML = d.jobs.map((j) => {
       const when = new Date(j.finished_at * 1000).toLocaleTimeString();
-      const out = j.output ? `<span class="link" onclick="openPath('${escapeHtml(j.output).replace(/'/g, '&#39;')}')">${escapeHtml(j.output.split(/[\\/]/).pop())}</span>` : '<span class="dim">—</span>';
+      const out = j.output ? `<span class="link act-open" data-path="${escapeHtml(j.output)}">${escapeHtml(j.output.split(/[\\/]/).pop())}</span>` : '<span class="dim">—</span>';
       return `<div class="history-item"><span class="k">${escapeHtml(j.kind)}</span><span class="mono dim">${when}</span><span>${j.clips} clips · ${j.hits} hits${j.keywords != null ? ' · ' + j.keywords + ' keywords' : ''}</span><span class="mono dim">${formatDuration(j.elapsed)}</span><span>${j.cancelled ? '<span class="text-rose">cancelled</span>' : out}</span></div>`;
     }).join('');
   } catch (_) {}
@@ -1725,6 +1763,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   try { initWaveformAndScrubber(); } catch (err) { console.error('Scrubber init error:', err); }
   try { initKeyboardShortcuts(); } catch (err) { console.error('Keyboard init error:', err); }
   try { initDropZone(); } catch (err) { console.error('Dropzone init error:', err); }
+  try { initClipTableHandlers(); initPathActionHandlers(); } catch (err) { console.error('Handler init error:', err); }
   try { bindConfigInputs(); } catch (err) { console.error('Config bind error:', err); }
   try { await loadConfig(); } catch (err) { console.error('Config init error:', err); }
   try { loadSystemInfo(false); } catch (err) { console.error('System info error:', err); }
@@ -1738,5 +1777,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (saved && $('tab-' + saved) && saved !== 'setup' && (detectedClips.length || latestResult)) switchTab(saved);
   } catch (_) {}
   updateMarkerLabels();
+  document.querySelectorAll('details.drawer').forEach((d) => {
+    try { if (localStorage.getItem('supercut.drawer.' + d.id) === '1') d.open = true; } catch (_) {}
+    d.addEventListener('toggle', () => { try { localStorage.setItem('supercut.drawer.' + d.id, d.open ? '1' : '0'); } catch (_) {} });
+  });
   window.addEventListener('beforeunload', () => { if (configDirty) { try { navigator.sendBeacon && navigator.sendBeacon('/api/config', new Blob([JSON.stringify(collectCurrentConfig())], { type: 'application/json' })); } catch (_) {} } });
 });

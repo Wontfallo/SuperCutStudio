@@ -492,20 +492,6 @@ def test_one_click_pipeline_and_folder_stitch(client, tmp_path):
     assert state.job_result is not None and state.job_result.batch_output_file == str(out)
 
 
-def test_discovery_job(client, tmp_path):
-    video = tmp_path / "a.mp4"
-    video.write_bytes(b"x")
-    with patch("web_app.SuperCutPipeline") as MockPipeline:
-        inst = MagicMock()
-        inst.cancelled = False
-        inst.discover_keywords.return_value = ([("machine learning", 4.2), ("rockets", 3.1)], [])
-        MockPipeline.return_value = inst
-        assert client.post("/api/discover", json={"input_path": str(video), "top_n": 5}).status_code == 200
-        assert _wait_idle()
-    kws = client.get("/api/discovered").json()["keywords"]
-    assert kws[0]["keyword"] == "machine learning"
-
-
 def test_job_error_is_reported(client, tmp_path):
     video = tmp_path / "a.mp4"
     video.write_bytes(b"x")

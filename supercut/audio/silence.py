@@ -92,9 +92,15 @@ def optimize_clip_boundaries(
             c_end = min(total_duration, c_end)
 
         if sentence_mode and segments:
-            c_start, c_end = expand_to_sentence_boundaries(hit.start, hit.end, segments)
+            # Grow to the enclosing sentence first, then still apply the user's padding around it.
+            sent_start, sent_end = expand_to_sentence_boundaries(hit.start, hit.end, segments)
+            c_start = max(0.0, sent_start - pre_pad)
+            c_end = sent_end + post_pad
             if total_duration > 0:
                 c_end = min(total_duration, c_end)
+            if snap_to_silence and words:
+                c_start = max(0.0, snap_boundary_to_word_gaps(c_start, words, silence_window, prefer_after=False))
+                c_end = snap_boundary_to_word_gaps(c_end, words, silence_window, prefer_after=True)
         elif snap_to_silence and words:
             # Snap start to the nearest pause before or around start
             c_start = max(0.0, snap_boundary_to_word_gaps(c_start, words, silence_window, prefer_after=False))

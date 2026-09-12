@@ -6,7 +6,7 @@ API with Server-Sent Events telemetry:
 
   Setup      : /api/system /api/config /api/scan /api/upload /api/pick /api/open
   Jobs       : /api/analyze /api/render /api/pipeline/start /api/stitch-folder-only
-               /api/discover /api/cancel /api/status /api/events /api/jobs /api/logs
+               /api/cancel /api/status /api/events /api/jobs /api/logs
   Reviewer   : /api/clips (+ update/add/delete/batch_toggle) /api/waveform /api/media
   Transcript : /api/transcript /api/transcript/export
   Delivery   : /api/result /api/download /api/cache/clear
@@ -136,12 +136,6 @@ class AnalyzeRequest(BaseModel):
     config: Optional[ConfigModel] = None
 
 
-class DiscoverRequest(BaseModel):
-    input_path: Optional[str] = None
-    top_n: int = 15
-    config: Optional[ConfigModel] = None
-
-
 class ClipToggleRequest(BaseModel):
     video_path: str
     clip_index: int
@@ -246,7 +240,7 @@ class StudioState:
         self.lock = threading.RLock()
         self.current_pipeline: Optional[SuperCutPipeline] = None
         self.worker_thread: Optional[threading.Thread] = None
-        self.status: str = "idle"  # idle, analyzing, rendering, stitching, discovering, cancelled, error
+        self.status: str = "idle"  # idle, analyzing, rendering, stitching, cancelled, error
         self.stage: str = "Idle"
         self.progress_pct: float = 0.0
         self.progress_msg: str = "Ready"
@@ -259,7 +253,6 @@ class StudioState:
         self.job_history: Deque[Dict[str, Any]] = deque(maxlen=25)
         self.log_buffer: Deque[Dict[str, Any]] = deque(maxlen=600)
         self.known_media: Set[str] = set()
-        self.last_discovered: List[Dict[str, Any]] = []
         self.shutdown_token = os.environ.get("VKS_SHUTDOWN_TOKEN", "")
         self.desktop_mode = bool(os.environ.get("VKS_DESKTOP", ""))
 
@@ -362,7 +355,7 @@ class StudioState:
         }
 
     def busy(self) -> bool:
-        return self.status in ("analyzing", "rendering", "stitching", "discovering")
+        return self.status in ("analyzing", "rendering", "stitching")
 
     def begin_job(self, status: str, stage: str, msg: str) -> None:
         self.status = status
@@ -752,7 +745,7 @@ def start_analysis(req: AnalyzeRequest):
         input_path = _resolve_input(req.input_path)
         job_config = state.to_job_config()
         if not job_config.keywords and not job_config.auto_keywords and not job_config.high_energy:
-            raise HTTPException(status_code=400, detail="Add at least one keyword (or enable auto-discovery).")
+            raise HTTPException(status_code=400, detail="Add at least one keyword first.")
 
         pipeline = _make_pipeline(job_config, "Analysis")
         state.current_pipeline = pipeline
@@ -761,7 +754,7 @@ def start_analysis(req: AnalyzeRequest):
 
     state.broadcast_log("hdr", "=== ANALYSIS STARTED ===")
     state.broadcast_log("info", f"Input: {input_path}")
-    state.broadcast_log("hit", f"Keywords: {', '.join(job_config.keywords) or '(auto-discover)'}")
+    state.broadcast_log("hit", f"Keywords: {', '.join(job_config.keywords)}")
     state.broadcast_event("job_started", {"kind": "analyze", "input_path": input_path})
 
     def worker():
@@ -867,7 +860,7 @@ def start_full_pipeline(req: AnalyzeRequest):
 
     state.broadcast_log("hdr", "=== STARTING 1-CLICK SUPERCUT PIPELINE ===")
     state.broadcast_log("info", f"Input Media: {input_path}")
-    state.broadcast_log("hit", f"Target Keywords: {', '.join(job_config.keywords) or '(auto-discover)'}")
+    state.broadcast_log("hit", f"Target Keywords: {', '.join(job_config.keywords)}")
     state.broadcast_log("info", f"Model: {job_config.model} | Aspect: {job_config.aspect_ratio.value} | "
                                 f"Transition: {job_config.transition.value} | Encoder: {job_config.encoder.value}")
     state.broadcast_event("job_started", {"kind": "supercut", "input_path": input_path, "keywords": job_config.keywords})
@@ -984,53 +977,6 @@ def start_stitch_folder_only(req: AnalyzeRequest):
     return {"status": "started", "stage": "stitching"}
 
 
-@app.post("/api/discover")
-def start_discovery(req: DiscoverRequest):
-    """Transcribe the inputs and auto-discover the strongest keywords / phrases."""
-    with state.lock:
-        if state.busy():
-            raise HTTPException(status_code=409, detail="A pipeline job is already in progress.")
-        if req.config:
-            state.save_config(req.config.model_dump())
-        input_path = _resolve_input(req.input_path)
-        job_config = state.to_job_config()
-        pipeline = _make_pipeline(job_config, "Discovery")
-        state.current_pipeline = pipeline
-        state.begin_job("discovering", "Keyword Discovery", "Transcribing media to discover keywords...")
-        top_n = max(3, min(50, int(req.top_n or 15)))
-
-    state.broadcast_log("hdr", "=== AUTO KEYWORD DISCOVERY ===")
-    state.broadcast_event("job_started", {"kind": "discover", "input_path": input_path})
-
-    def worker():
-        t0 = time.time()
-        try:
-            ranked, stats_list = pipeline.discover_keywords(input_path, top_n=top_n)
-            keywords = [{"keyword": k, "score": round(s, 3)} for k, s in ranked]
-            with state.lock:
-                state.last_discovered = keywords
-                for s in stats_list:
-                    state.known_media.add(str(Path(s.path).resolve()))
-                if not state.analyzed_stats:
-                    state.analyzed_stats = stats_list  # transcripts available in the inspector
-                if pipeline.cancelled:
-                    state.finish_job("Cancelled", "Discovery cancelled.", status="cancelled")
-                else:
-                    state.finish_job("Discovery Complete", f"Discovered {len(keywords)} keyword(s).")
-            state.record_history("discover", None, time.time() - t0, {"keywords": len(keywords)})
-            if pipeline.cancelled:
-                state.broadcast_event("cancelled", {"msg": "Discovery cancelled."})
-            else:
-                state.broadcast_log("hit", "Discovered: " + ", ".join(k["keyword"] for k in keywords[:12]))
-                state.broadcast_event("discovered", {"keywords": keywords, "stats_count": len(stats_list)})
-        except Exception as e:
-            log.exception("Discovery failed")
-            state.fail_job("Discovery", str(e))
-
-    _start_worker(worker)
-    return {"status": "started", "stage": "discovering"}
-
-
 @app.post("/api/cancel")
 def cancel_job():
     """Cancel any actively running analysis or render pipeline."""
@@ -1057,11 +1003,6 @@ def get_job_history():
 def get_logs(limit: int = 200):
     items = list(state.log_buffer)[-max(1, min(600, limit)):]
     return {"count": len(items), "logs": items}
-
-
-@app.get("/api/discovered")
-def get_discovered():
-    return {"keywords": state.last_discovered}
 
 
 # ---------------------------------------------------------------------------
@@ -1103,8 +1044,11 @@ def get_clips():
             clips_payload.append(_clip_payload(stats, s_idx, clip))
 
     selected = [c for c in clips_payload if c["selected"]]
+    cfg = state.config_data
     return {
         "count": len(clips_payload),
+        "total_hits": sum(v["hits"] for v in videos),
+        "boundaries": {"pre_pad": cfg.get("pre_pad", 1.0), "post_pad": cfg.get("post_pad", 1.0), "merge_gap": cfg.get("merge_gap", 0.5)},
         "selected_count": len(selected),
         "selected_footage": round(sum(c["duration"] for c in selected), 2),
         "videos": videos,
@@ -1246,6 +1190,10 @@ def get_transcript(video_path: Optional[str] = None, words: bool = True):
                     for w in seg.words
                 ]
             segments_data.append(item)
+        hit_spans = [
+            {"start": round(h.start, 3), "end": round(h.end, 3), "keyword": h.keyword, "clip_index": c.index}
+            for c in s.intervals for h in c.keyword_hits
+        ]
         results.append({
             "video_path": s.path,
             "filename": Path(s.path).name,
@@ -1255,6 +1203,8 @@ def get_transcript(video_path: Optional[str] = None, words: bool = True):
             "word_count": len(s.transcript.all_words),
             "full_text": s.transcript.full_text,
             "segments": segments_data,
+            "hits": hit_spans,
+            "hit_count": len(hit_spans),
             "cached": s.transcript_cached,
         })
 
