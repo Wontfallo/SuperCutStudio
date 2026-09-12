@@ -278,6 +278,7 @@ class JobConfig:
     snap_silence_window: float = 0.8     # seconds to search for acoustic pause
     sentence_mode: bool = False         # expand clip to full enclosing sentence
     merge_gap: float = 0.5              # merge clips closer than this (seconds)
+    merge_hits: bool = True             # False = one clip per keyword hit, even if they overlap
     min_confidence: float = 0.0
     auto_keywords: bool = False
     auto_keywords_top_n: int = 15

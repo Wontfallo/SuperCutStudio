@@ -319,6 +319,7 @@ const CONFIG_BINDINGS = [
   ['setting-sentence-mode', 'sentence_mode', 'bool'],
   ['setting-snap-silence', 'snap_to_silence', 'bool'],
   ['setting-high-energy', 'high_energy', 'bool'],
+  ['setting-one-per-hit', 'merge_hits', 'inverted-bool'],
   ['setting-fuzzy', 'fuzzy_threshold', 'number'],
   ['setting-pre-pad', 'pre_pad', 'number'],
   ['setting-post-pad', 'post_pad', 'number'],
@@ -331,6 +332,7 @@ function applyConfigToForm() {
     const el = $(id);
     if (!el || appConfig[key] === undefined || appConfig[key] === null) continue;
     if (type === 'bool') el.checked = !!appConfig[key];
+    else if (type === 'inverted-bool') el.checked = !appConfig[key];
     else el.value = appConfig[key];
   }
   setInputMode(appConfig.input_mode === 'File' ? 'File' : 'Folder', false);
@@ -347,6 +349,7 @@ function collectCurrentConfig() {
     const el = $(id);
     if (!el) continue;
     if (type === 'bool') cfg[key] = !!el.checked;
+    else if (type === 'inverted-bool') cfg[key] = !el.checked;
     else if (type === 'number') { const v = parseFloat(el.value); cfg[key] = isNaN(v) ? (appConfig[key] ?? 0) : v; }
     else cfg[key] = (el.value || '').trim();
   }
@@ -1009,7 +1012,7 @@ async function loadClips() {
     if (summary) {
       const hits = data.total_hits || 0;
       const b = data.boundaries || {};
-      if (data.count > 0 && hits > data.count) {
+      if (data.count > 0 && hits > data.count && b.merge_hits !== false) {
         summary.textContent = `${hits} keyword hits merged into ${data.count} clip(s): hits closer together than the padding (${(b.pre_pad ?? 1).toFixed(1)}s before / ${(b.post_pad ?? 1).toFixed(1)}s after) are joined into one clip. Lower the padding in Setup for more, shorter clips.`;
       } else if (data.count > 0) {
         summary.textContent = `${hits} keyword hit(s) → ${data.count} clip(s). Review, audition and curate what gets stitched.`;

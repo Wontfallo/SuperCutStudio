@@ -84,3 +84,15 @@ def test_sentence_mode_pads_first_then_expands_outward():
     clips = optimize_clip_boundaries([hit], [], segments, pre_pad=2.0, post_pad=2.0,
                                      snap_to_silence=False, sentence_mode=False, total_duration=30.0)
     assert (clips[0].start, clips[0].end) == (5.0, 9.5)
+
+
+def test_one_clip_per_hit_never_merges():
+    from supercut.models import HitSpan
+    from supercut.audio.silence import optimize_clip_boundaries
+    hits = [HitSpan("a", "a", 10.0, 10.4), HitSpan("b", "b", 11.0, 11.4), HitSpan("a", "a", 30.0, 30.4)]
+    merged = optimize_clip_boundaries(hits, [], [], pre_pad=3.0, post_pad=3.0, snap_to_silence=False, total_duration=60.0)
+    assert len(merged) == 2  # first two overlap -> merged
+    separate = optimize_clip_boundaries(hits, [], [], pre_pad=3.0, post_pad=3.0, snap_to_silence=False, total_duration=60.0, merge=False)
+    assert len(separate) == 3
+    assert [c.primary_keyword for c in separate] == ["a", "b", "a"]
+    assert [c.index for c in separate] == [1, 2, 3]

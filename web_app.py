@@ -105,6 +105,7 @@ class ConfigModel(BaseModel):
     snap_to_silence: bool = True
     sentence_mode: bool = False
     merge_gap: float = 0.5
+    merge_hits: bool = True
     max_clip_duration: float = 0.0
     case_sensitive: bool = False
     use_regex: bool = False
@@ -1075,7 +1076,7 @@ def get_clips():
     return {
         "count": len(clips_payload),
         "total_hits": sum(v["hits"] for v in videos),
-        "boundaries": {"pre_pad": cfg.get("pre_pad", 1.0), "post_pad": cfg.get("post_pad", 1.0), "merge_gap": cfg.get("merge_gap", 0.5)},
+        "boundaries": {"pre_pad": cfg.get("pre_pad", 1.0), "post_pad": cfg.get("post_pad", 1.0), "merge_gap": cfg.get("merge_gap", 0.5), "merge_hits": cfg.get("merge_hits", True)},
         "selected_count": len(selected),
         "selected_footage": round(sum(c["duration"] for c in selected), 2),
         "videos": videos,

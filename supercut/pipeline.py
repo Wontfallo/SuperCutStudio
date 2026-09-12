@@ -336,6 +336,7 @@ class SuperCutPipeline:
                     total_duration=stats.info.duration,
                     merge_gap=getattr(self.config, "merge_gap", 0.5),
                     source_video=vp,
+                    merge=getattr(self.config, "merge_hits", True),
                 )
 
             if getattr(self.config, "high_energy", False):

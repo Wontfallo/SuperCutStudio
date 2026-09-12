@@ -93,6 +93,7 @@ def optimize_clip_boundaries(
     total_duration: float = 0.0,
     merge_gap: float = 0.5,
     source_video: str = "",
+    merge: bool = True,
 ) -> List[ClipInterval]:
     """Convert raw HitSpans into optimized, padded, silence-snapped, and merged ClipIntervals."""
     if not hits:
@@ -138,9 +139,12 @@ def optimize_clip_boundaries(
     # Sort intervals by start time
     raw_intervals.sort(key=lambda x: x[0])
 
-    # Merge overlapping or close intervals
+    # Merge overlapping or close intervals (unless the user wants one clip per hit)
     merged: List[ClipInterval] = []
     for c_start, c_end, hit in raw_intervals:
+        if not merge:
+            merged.append(ClipInterval(start=c_start, end=c_end, keyword_hits=[hit], source_video=source_video, index=len(merged) + 1))
+            continue
         if not merged:
             merged.append(
                 ClipInterval(
