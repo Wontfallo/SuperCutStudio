@@ -679,3 +679,6 @@ kbd { background: #333; border-color: #6a6a6a; color: #fff; }
 .file-item.excluded .file-name span:last-child { text-decoration: line-through; }
 .file-item .file-acts { display: flex; gap: 6px; flex-shrink: 0; }
 .file-item .file-acts .btn.small { padding: 4px 10px; font-size: 14px; }
+
+.check.disabled { opacity: .45; cursor: not-allowed; }
+.check.disabled input { cursor: not-allowed; }

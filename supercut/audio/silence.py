@@ -115,12 +115,10 @@ def optimize_clip_boundaries(
             # Order of authority: padding first, then sentence expansion.
             # The padded edges are pushed OUTWARD to the boundaries of whichever
             # sentence they land in:  [sentence start] <- pre-pad <- hit -> post-pad -> [sentence end]
+            # Cuts now sit on sentence boundaries, so silence snapping is redundant here.
             c_start, c_end = expand_edges_to_sentences(c_start, c_end, segments)
             if total_duration > 0:
                 c_end = min(total_duration, c_end)
-            if snap_to_silence and words:
-                c_start = max(0.0, snap_boundary_to_word_gaps(c_start, words, silence_window, prefer_after=False))
-                c_end = snap_boundary_to_word_gaps(c_end, words, silence_window, prefer_after=True)
         elif snap_to_silence and words:
             # Snap start to the nearest pause before or around start
             c_start = max(0.0, snap_boundary_to_word_gaps(c_start, words, silence_window, prefer_after=False))

@@ -160,6 +160,15 @@ async function runBrowserTests() {
     assert(document.querySelectorAll('#scanned-list .file-item.excluded').length === 0, 'Restore puts it back');
     pass('Folder scan lets you remove and restore individual files');
 
+    // Full-sentence expansion makes snap-to-silence redundant
+    const sentenceBox = document.getElementById('setting-sentence-mode');
+    const snapBox = document.getElementById('setting-snap-silence');
+    sentenceBox.checked = true; sentenceBox.dispatchEvent(new window.Event('change', { bubbles: true }));
+    assert(snapBox.disabled === true, 'Snap to silence disabled while sentence mode is on');
+    sentenceBox.checked = false; sentenceBox.dispatchEvent(new window.Event('change', { bubbles: true }));
+    assert(snapBox.disabled === false, 'Snap to silence re-enabled');
+    pass('Snap to silence is greyed out while full-sentence expansion is on');
+
     // Drop zone
     const dropZone = document.getElementById('drop-zone');
     const fileUploader = document.getElementById('file-uploader');

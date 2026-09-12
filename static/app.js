@@ -335,6 +335,7 @@ function applyConfigToForm() {
   }
   setInputMode(appConfig.input_mode === 'File' ? 'File' : 'Folder', false);
   updateSliderLabels();
+  updateShapingDependencies();
   updateModelHint();
   renderKeywordChips();
   renderExcludeChips();
@@ -391,6 +392,22 @@ function scheduleSave() {
   saveTimer = setTimeout(() => saveCurrentConfig(false), 700);
 }
 
+function updateShapingDependencies() {
+  const sentence = $('setting-sentence-mode');
+  const snap = $('setting-snap-silence');
+  if (!sentence || !snap) return;
+  const redundant = sentence.checked;
+  snap.disabled = redundant;
+  const label = snap.closest('label');
+  if (label) {
+    label.classList.toggle('disabled', redundant);
+    label.title = redundant
+      ? 'Not needed: with full-sentence expansion every cut already sits on a sentence boundary.'
+      : 'Applied last. If a cut point lands in the middle of a spoken word, it slides to the nearest gap between words (at most 0.8 s away) so the clip never starts or ends on a chopped word.';
+  }
+}
+window.updateShapingDependencies = updateShapingDependencies;
+
 function updateSliderLabels() {
   const fz = parseFloat($('setting-fuzzy').value) || 0;
   $('fuzzy-label').textContent = fz <= 0.01 ? 'off (exact)' : fz.toFixed(2);
@@ -405,7 +422,7 @@ function bindConfigInputs() {
   for (const [id] of CONFIG_BINDINGS) {
     const el = $(id);
     if (!el) continue;
-    el.addEventListener('change', () => { updateSliderLabels(); updateModelHint(); scheduleSave(); });
+    el.addEventListener('change', () => { updateSliderLabels(); updateModelHint(); updateShapingDependencies(); scheduleSave(); });
     if (el.type === 'range') el.addEventListener('input', updateSliderLabels);
   }
 }
