@@ -40,6 +40,22 @@ def gpu_name() -> Optional[str]:
     return None
 
 
+def build_stamp() -> str:
+    """When this copy of the app was built (exe mtime when frozen, 'dev' from source)."""
+    import datetime
+
+    if is_frozen():
+        try:
+            ts = os.path.getmtime(sys.executable)
+            return datetime.datetime.fromtimestamp(ts).strftime("%b %d %H:%M")
+        except OSError:
+            return "unknown"
+    return "dev"
+
+
+_STARTED_AT = __import__("time").time()
+
+
 def system_report(probe_encoders: bool = True) -> Dict[str, Any]:
     encoders = probe_available_encoders() if (probe_encoders and ffmpeg_available()) else {}
     crisper_py = find_crisper_python()
@@ -54,6 +70,9 @@ def system_report(probe_encoders: bool = True) -> Dict[str, Any]:
             "data_dir": str(data_dir()),
             "logs_dir": str(logs_dir()),
             "default_output_dir": str(default_output_dir()),
+            "build": build_stamp(),
+            "started_at": _STARTED_AT,
+            "pid": os.getpid(),
         },
         "ffmpeg": {
             "available": ffmpeg_available(),

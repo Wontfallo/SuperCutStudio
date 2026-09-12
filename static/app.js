@@ -197,6 +197,12 @@ async function loadSystemInfo(refresh) {
     systemInfo = await api('/api/system' + (refresh ? '?refresh=true' : ''));
     populateModelSelect();
     renderSystemModal();
+    const stamp = $('build-stamp');
+    if (stamp && systemInfo.app) {
+      const started = systemInfo.app.started_at ? new Date(systemInfo.app.started_at * 1000) : null;
+      stamp.textContent = `build ${systemInfo.app.build || '?'}` + (started ? ` · running since ${started.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '');
+      stamp.title = `Process ${systemInfo.app.pid || ''} · ${systemInfo.app.frozen ? 'installed/portable build' : 'running from source'}`;
+    }
     if (!systemInfo.ffmpeg || !systemInfo.ffmpeg.available) {
       showToast('FFmpeg was not found. Install FFmpeg or set VKS_FFMPEG.', 'error', 8000);
     }
