@@ -319,8 +319,6 @@ const CONFIG_BINDINGS = [
   ['setting-export-transcript', 'export_transcript', 'bool'],
   ['setting-export-fcpxml', 'export_fcpxml', 'bool'],
   ['setting-export-edl', 'export_edl', 'bool'],
-  ['setting-case-sensitive', 'case_sensitive', 'bool'],
-  ['setting-regex', 'use_regex', 'bool'],
   ['setting-sentence-mode', 'sentence_mode', 'bool'],
   ['setting-snap-silence', 'snap_to_silence', 'bool'],
   ['setting-high-energy', 'high_energy', 'bool'],
@@ -575,7 +573,8 @@ function addKeyword(word) {
   if (!appConfig.keywords) appConfig.keywords = [];
   const lower = clean.toLowerCase();
   if (appConfig.keywords.some((k) => k.toLowerCase() === lower)) return;
-  appConfig.keywords.push($('setting-case-sensitive').checked ? clean : lower);
+  const cs = $('setting-case-sensitive');
+  appConfig.keywords.push(cs && cs.checked ? clean : lower);
   renderKeywordChips();
   scheduleSave();
 }
