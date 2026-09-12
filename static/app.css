@@ -672,3 +672,10 @@ kbd { background: #333; border-color: #6a6a6a; color: #fff; }
 ::selection { background: var(--cyan); color: #000; }
 ::-webkit-scrollbar-thumb { background: #5c5c5c; }
 ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+/* Selectable log and excluded files */
+.log-console { user-select: text; cursor: text; }
+.file-item.excluded { opacity: .45; }
+.file-item.excluded .file-name span:last-child { text-decoration: line-through; }
+.file-item .file-acts { display: flex; gap: 6px; flex-shrink: 0; }
+.file-item .file-acts .btn.small { padding: 4px 10px; font-size: 14px; }

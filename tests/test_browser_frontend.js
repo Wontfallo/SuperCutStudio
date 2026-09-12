@@ -142,6 +142,24 @@ async function runBrowserTests() {
     assert(btnFile.classList.contains('active'), 'Scan of a file switches to File mode');
     pass('Path sanitization, scan request and probed asset card verified');
 
+    // Folder scan: remove / restore files
+    window.fetch = ((orig) => async (url, opts) => {
+        if (String(url) === '/api/scan') return json({ input_path: 'C:/vids', is_file: false, count: 2, active_count: 2, total_duration: 20, files: [{ path: 'C:/vids/a.mp4', filename: 'a.mp4', resolution: '1920x1080', duration: 10, fps: 30, has_audio: true, video_codec: 'h264', size_bytes: 10, readable: true, excluded: false }, { path: 'C:/vids/b.mp4', filename: 'b.mp4', resolution: '1920x1080', duration: 10, fps: 30, has_audio: true, video_codec: 'h264', size_bytes: 10, readable: true, excluded: false }] });
+        if (String(url) === '/api/reset') { fetchCalls.push({ url, opts }); return json({ status: 'ok' }); }
+        return orig(url, opts);
+    })(window.fetch);
+    inputPath.value = 'C:/vids';
+    await window.scanMediaSource();
+    let toggles = document.querySelectorAll('#scanned-list .file-toggle');
+    assert(toggles.length === 2, 'Each folder file gets a remove button');
+    toggles[1].click();
+    assert(document.querySelectorAll('#scanned-list .file-item.excluded').length === 1, 'Removed file greyed out');
+    assert(document.getElementById('scanned-count').textContent === '1 of 2', 'Count shows active of total');
+    assert(window.collectCurrentConfig().excluded_files.includes('C:/vids/b.mp4'), 'Exclusion goes into config');
+    document.querySelectorAll('#scanned-list .file-toggle')[1].click();
+    assert(document.querySelectorAll('#scanned-list .file-item.excluded').length === 0, 'Restore puts it back');
+    pass('Folder scan lets you remove and restore individual files');
+
     // Drop zone
     const dropZone = document.getElementById('drop-zone');
     const fileUploader = document.getElementById('file-uploader');
@@ -353,6 +371,15 @@ async function runBrowserTests() {
     assert(document.getElementById('telemetry-stage').textContent === 'CANCELLED', 'Cancel sets CANCELLED stage');
     assert(document.getElementById('btn-cancel').classList.contains('hidden'), 'Stop hidden after cancel');
     pass('SSE error and cancelled events reset the running UI with feedback');
+
+    // Start over clears the session
+    await window.resetSession();
+    await tick(40);
+    assert(fetchCalls.some((c) => c.url === '/api/reset'), '/api/reset called');
+    assert(document.getElementById('badge-clip-count').textContent === '0', 'Clip badge reset');
+    assert(document.getElementById('render-result-banner').classList.contains('hidden'), 'Result banner hidden');
+    assert(!document.getElementById('tab-setup').classList.contains('hidden'), 'Back on Setup');
+    pass('Start over resets clips, results and returns to Setup');
 
     // Modals
     window.openShortcutsModal();

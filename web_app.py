@@ -86,6 +86,7 @@ class ConfigModel(BaseModel):
     input_mode: str = "Folder"
     keywords: List[str] = Field(default_factory=list)
     exclude_keywords: List[str] = Field(default_factory=list)
+    excluded_files: List[str] = Field(default_factory=list)
     output_dir: str = ""
     output_name: str = ""
     model: str = "crisper-turbo"
@@ -564,6 +565,7 @@ def update_config(cfg: ConfigModel):
     data["output_dir"] = clean_path(data.get("output_dir", "")) or str(OUTPUT_DIR)
     data["keywords"] = list(dict.fromkeys(k.strip() for k in data.get("keywords", []) if k and k.strip()))
     data["exclude_keywords"] = list(dict.fromkeys(k.strip() for k in data.get("exclude_keywords", []) if k and k.strip()))
+    data["excluded_files"] = list(dict.fromkeys(clean_path(p) for p in data.get("excluded_files", []) if p and clean_path(p)))
     state.save_config(data)
     state.broadcast_event("config_updated", {"config": state.config_data})
     return {"status": "ok", "config": state.config_data}
@@ -585,19 +587,23 @@ def scan_media(req: ScanRequest):
         raise HTTPException(status_code=404, detail=f"Target path does not exist: {target}")
 
     found_files = scan_video_files(target)
+    excluded = {os.path.normcase(os.path.abspath(x)) for x in state.config_data.get("excluded_files", []) or []}
     media_list = []
     total_duration = 0.0
     for fpath in found_files:
         info = probe_media(fpath)
         entry = media_summary(fpath, info)
+        entry["excluded"] = os.path.normcase(os.path.abspath(fpath)) in excluded
         media_list.append(entry)
-        total_duration += entry["duration"]
+        if not entry["excluded"]:
+            total_duration += entry["duration"]
         state.known_media.add(str(Path(fpath).resolve()))
 
     return {
         "input_path": target,
         "is_file": p.is_file(),
         "count": len(media_list),
+        "active_count": sum(1 for m in media_list if not m["excluded"]),
         "total_duration": round(total_duration, 2),
         "files": media_list,
     }
@@ -975,6 +981,27 @@ def start_stitch_folder_only(req: AnalyzeRequest):
 
     _start_worker(worker)
     return {"status": "started", "stage": "stitching"}
+
+
+@app.post("/api/reset")
+def reset_session():
+    """Forget the current analysis and results so a fresh job can start from a clean slate."""
+    with state.lock:
+        if state.busy():
+            raise HTTPException(status_code=409, detail="Stop the running job before starting over.")
+        state.analyzed_stats = []
+        state.job_result = None
+        state.current_pipeline = None
+        state.error_message = None
+        state.status = "idle"
+        state.stage = "Idle"
+        state.progress_pct = 0.0
+        state.progress_msg = "Ready"
+        state.job_started_at = 0.0
+    state.broadcast_log("hdr", "=== SESSION RESET ===")
+    state.broadcast_event("reset", {})
+    state.broadcast_event("progress", {"pct": 0, "msg": "Ready", "stage": "Idle", "elapsed": 0, "eta": None})
+    return {"status": "ok"}
 
 
 @app.post("/api/cancel")

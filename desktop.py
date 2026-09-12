@@ -156,9 +156,10 @@ def _run_webview(url: str) -> bool:
             url,
             width=1440,
             height=920,
-            min_size=(1080, 700),
-            background_color="#0b0f19",
-            text_select=False,
+            min_size=(900, 600),
+            resizable=True,
+            background_color="#121212",
+            text_select=True,
         )
         window_holder["win"] = window
         register_native_picker(picker)

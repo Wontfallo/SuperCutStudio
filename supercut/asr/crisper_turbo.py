@@ -91,6 +91,38 @@ def find_crisper_python(verify: bool = False) -> Optional[Path]:
     return None
 
 
+def _hf_cache_roots() -> List[Path]:
+    roots: List[Path] = []
+    if os.environ.get("HUGGINGFACE_HUB_CACHE"):
+        roots.append(Path(os.environ["HUGGINGFACE_HUB_CACHE"]))
+    if os.environ.get("HF_HOME"):
+        roots.append(Path(os.environ["HF_HOME"]) / "hub")
+    roots.append(Path.home() / ".cache" / "huggingface" / "hub")
+    return roots
+
+
+def crisper_model_cached(shorthand: str = "turbo") -> bool:
+    """True when the CrisperWhisper weights are already in the Hugging Face cache."""
+    repo_dir = f"models--nyralabs--CrisperWhisper2.0_{shorthand}"
+    return any((root / repo_dir).is_dir() for root in _hf_cache_roots())
+
+
+def crisper_worker_env() -> dict:
+    """Environment for the worker: offline when cached so transformers never
+    re-resolves the gated repo (which fails without a token and breaks processor loading)."""
+    env = dict(os.environ)
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("PYTHONUTF8", "1")
+    env.pop("PYTHONPATH", None)
+    env.pop("PYTHONHOME", None)
+    env.setdefault("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
+    if crisper_model_cached("turbo"):
+        env["HF_HUB_OFFLINE"] = "1"
+        env["TRANSFORMERS_OFFLINE"] = "1"
+        env["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    return env
+
+
 def crisper_available() -> bool:
     if importlib.util.find_spec("crisperwhisper") is not None:
         return True
@@ -179,11 +211,7 @@ class CrisperWhisperBackend:
             tf.write(_WORKER_SCRIPT)
             script_path = tf.name
 
-        env = dict(os.environ)
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        env.setdefault("PYTHONUTF8", "1")
-        env.pop("PYTHONPATH", None)
-        env.pop("PYTHONHOME", None)
+        env = crisper_worker_env()
 
         # Generous timeout: model load + ~0.25x realtime on GPU, much slower on CPU.
         timeout = 900.0 + max(0.0, fallback_duration) * 1.5
@@ -264,8 +292,12 @@ class CrisperWhisperBackend:
             if timed_out:
                 raise RuntimeError(f"CrisperWhisper worker timed out after {timeout:.0f}s")
             if proc.returncode != 0:
-                tail = "\n".join(stderr_tail[-12:]).strip()
-                raise RuntimeError(f"CrisperWhisper worker failed (exit {proc.returncode}): {tail or 'no output'}")
+                lines = [ln for ln in stderr_tail if ln.strip()]
+                last = lines[-1] if lines else "no output"
+                hint = ""
+                if "Unrecognized processing class" in last or "processor" in last.lower():
+                    hint = " (model files could not be loaded from the Hugging Face cache; run once with internet access or check HF_HOME)"
+                raise RuntimeError(f"CrisperWhisper worker failed: {last}{hint}")
 
             stdout = "".join(stdout_lines)
             json_marker = "__JSON_START__\n"

@@ -354,6 +354,7 @@ function collectCurrentConfig() {
   cfg.input_mode = $('mode-file-btn') && $('mode-file-btn').classList.contains('active') ? 'File' : 'Folder';
   cfg.keywords = appConfig.keywords || [];
   cfg.exclude_keywords = appConfig.exclude_keywords || [];
+  cfg.excluded_files = appConfig.excluded_files || [];
   return cfg;
 }
 window.collectCurrentConfig = collectCurrentConfig;
@@ -363,6 +364,7 @@ async function loadConfig() {
     appConfig = await api('/api/config');
     if (!Array.isArray(appConfig.keywords)) appConfig.keywords = [];
     if (!Array.isArray(appConfig.exclude_keywords)) appConfig.exclude_keywords = [];
+    if (!Array.isArray(appConfig.excluded_files)) appConfig.excluded_files = [];
     applyConfigToForm();
   } catch (err) {
     console.error('Failed to load config:', err);
@@ -488,22 +490,53 @@ async function scanMediaSource(force = false) {
 }
 window.scanMediaSource = scanMediaSource;
 
+function isExcludedFile(path) {
+  const norm = String(path || '').toLowerCase();
+  return (appConfig.excluded_files || []).some((p) => String(p).toLowerCase() === norm);
+}
+
 function renderScannedFiles(data) {
   const container = $('scanned-assets-container');
   const list = $('scanned-list');
   container.classList.remove('hidden');
-  $('scanned-count').textContent = scannedFiles.length;
-  $('scanned-total').textContent = scannedFiles.length ? `${formatDuration(data.total_duration)} · ${formatBytes(scannedFiles.reduce((a, f) => a + (f.size_bytes || 0), 0))}` : '';
-  $('scanned-info').textContent = data.is_file ? 'single file' : 'folder';
+  const active = scannedFiles.filter((f) => !isExcludedFile(f.path));
+  $('scanned-count').textContent = scannedFiles.length === active.length ? String(scannedFiles.length) : `${active.length} of ${scannedFiles.length}`;
+  const activeDur = active.reduce((a, f) => a + (f.duration || 0), 0);
+  $('scanned-total').textContent = scannedFiles.length ? `${formatDuration(activeDur)} · ${formatBytes(active.reduce((a, f) => a + (f.size_bytes || 0), 0))}` : '';
+  $('scanned-info').textContent = data && data.is_file ? 'single file' : 'folder';
   list.innerHTML = '';
-  for (const f of scannedFiles) {
+  const isFolder = !(data && data.is_file);
+  scannedFiles.forEach((f, idx) => {
+    const excluded = isExcludedFile(f.path);
     const item = document.createElement('div');
-    item.className = 'file-item' + (f.readable ? '' : ' unreadable');
+    item.className = 'file-item' + (f.readable ? '' : ' unreadable') + (excluded ? ' excluded' : '');
     item.innerHTML = `
       <div class="file-name"><span class="dot ${f.has_audio ? 'dot-green' : 'dot-rose'}" title="${f.has_audio ? 'has audio' : 'no audio track'}"></span><span title="${escapeHtml(f.path)}">${escapeHtml(f.filename)}</span></div>
-      <div class="file-meta"><span>${escapeHtml(f.resolution)}</span><span>${formatDuration(f.duration)}</span><span>${f.fps} fps</span><span>${escapeHtml((f.video_codec || '').toUpperCase())}</span><span>${formatBytes(f.size_bytes)}</span></div>`;
+      <div class="file-meta"><span>${escapeHtml(f.resolution)}</span><span>${formatDuration(f.duration)}</span><span>${f.fps} fps</span><span>${escapeHtml((f.video_codec || '').toUpperCase())}</span><span>${formatBytes(f.size_bytes)}</span></div>
+      ${isFolder ? `<div class="file-acts"><button class="btn small file-toggle" data-idx="${idx}" title="${excluded ? 'Put this file back into the job' : 'Leave this file out of the job'}">${excluded ? 'Restore' : '✕ Remove'}</button></div>` : ''}`;
     list.appendChild(item);
-  }
+  });
+}
+
+function toggleExcludedFile(idx) {
+  const f = scannedFiles[idx];
+  if (!f) return;
+  if (!appConfig.excluded_files) appConfig.excluded_files = [];
+  const norm = f.path.toLowerCase();
+  const i = appConfig.excluded_files.findIndex((p) => String(p).toLowerCase() === norm);
+  if (i >= 0) appConfig.excluded_files.splice(i, 1); else appConfig.excluded_files.push(f.path);
+  renderScannedFiles({ is_file: false });
+  scheduleSave();
+}
+window.toggleExcludedFile = toggleExcludedFile;
+
+function initScannedListHandlers() {
+  const list = $('scanned-list');
+  if (!list) return;
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('.file-toggle');
+    if (btn) { e.preventDefault(); toggleExcludedFile(parseInt(btn.dataset.idx, 10)); }
+  });
 }
 
 function initDropZone() {
@@ -794,6 +827,46 @@ function appendLog(entry) {
 function clearLog() { $('log-console').innerHTML = ''; }
 window.clearLog = clearLog;
 
+async function copyLog() {
+  const lines = Array.from(document.querySelectorAll('#log-console .log-line')).map((l) => l.textContent.trim());
+  const text = lines.join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`Copied ${lines.length} log line(s).`, 'success', 2000);
+  } catch (_) {
+    // Fallback for contexts without clipboard permission
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast(`Copied ${lines.length} log line(s).`, 'success', 2000); } catch (e) { showToast('Copy failed - select the text and press Ctrl+C.', 'warning'); }
+    ta.remove();
+  }
+}
+window.copyLog = copyLog;
+
+async function resetSession() {
+  if (jobRunning) { showToast('Stop the running job first.', 'warning'); return; }
+  try {
+    await postJson('/api/reset');
+    detectedClips = []; clipVideos = []; allTranscripts = []; activePlayingClip = null; latestResult = null;
+    window.detectedClips = detectedClips; window.activePlayingClip = null;
+    renderClipsTable(); updateActiveClipDetails();
+    $('badge-clip-count').textContent = '0';
+    $('curated-count').textContent = '0';
+    $('curated-footage').textContent = '0.0s';
+    const summary = $('clips-summary'); if (summary) summary.textContent = 'Review, audition and curate what gets stitched.';
+    await loadTranscripts();
+    $('render-result-banner').classList.add('hidden'); $('render-empty').classList.remove('hidden'); $('badge-result').classList.add('hidden');
+    $('setup-completion-card').classList.add('hidden');
+    const player = $('studio-video-player'); player.removeAttribute('src'); player.dataset.path = ''; player.load();
+    updateScrubberUI(0, 0);
+    updateTelemetry(0, 'Ready', 'IDLE', 0, null);
+    setJobRunning(false, 'Ready');
+    switchTab('setup');
+    showToast('Session cleared. Pick a source and run a new job.', 'success', 3000);
+  } catch (err) { showToast('Reset failed: ' + err.message, 'error'); }
+}
+window.resetSession = resetSession;
+
 async function loadRecentLogs() {
   try {
     const d = await api('/api/logs?limit=150');
@@ -864,6 +937,7 @@ function initSSE() {
     showToast('SuperCut rendering complete. Master video ready.', 'success', 5000);
     loadJobHistory();
   });
+  eventSource.addEventListener('reset', () => { loadClips(); loadTranscripts(); loadLatestResult(); });
   eventSource.addEventListener('cancelled', () => {
     setJobRunning(false, 'Stopped');
     resetJobButtons();
@@ -1764,7 +1838,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   try { initWaveformAndScrubber(); } catch (err) { console.error('Scrubber init error:', err); }
   try { initKeyboardShortcuts(); } catch (err) { console.error('Keyboard init error:', err); }
   try { initDropZone(); } catch (err) { console.error('Dropzone init error:', err); }
-  try { initClipTableHandlers(); initPathActionHandlers(); } catch (err) { console.error('Handler init error:', err); }
+  try { initClipTableHandlers(); initPathActionHandlers(); initScannedListHandlers(); } catch (err) { console.error('Handler init error:', err); }
   try { bindConfigInputs(); } catch (err) { console.error('Config bind error:', err); }
   try { await loadConfig(); } catch (err) { console.error('Config init error:', err); }
   try { loadSystemInfo(false); } catch (err) { console.error('System info error:', err); }

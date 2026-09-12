@@ -268,6 +268,7 @@ class ClipInterval:
 class JobConfig:
     keywords: List[str] = field(default_factory=list)
     exclude_keywords: List[str] = field(default_factory=list)
+    excluded_files: List[str] = field(default_factory=list)   # source files the user removed from a folder scan
     case_sensitive: bool = False
     fuzzy_threshold: float = 0.0        # 0.0 = exact / plural only; > 0 = Levenshtein similarity ratio
     use_regex: bool = False

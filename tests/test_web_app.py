@@ -599,3 +599,37 @@ def test_download_rejects_non_artifact_types(client, tmp_path):
 
 def test_shutdown_requires_token(client):
     assert client.post("/api/shutdown").status_code == 403
+
+
+def test_reset_session_clears_state(client):
+    _seed_clips()
+    with state.lock:
+        state.job_result = JobResult(total_hits=2, total_clips_count=2)
+    assert client.post("/api/reset").json()["status"] == "ok"
+    assert state.analyzed_stats == [] and state.job_result is None
+    assert client.get("/api/clips").json()["count"] == 0
+    assert client.get("/api/result").json()["has_result"] is False
+    with state.lock:
+        state.status = "analyzing"
+    assert client.post("/api/reset").status_code == 409
+
+
+def test_excluded_files_flagged_and_skipped(client, tmp_path):
+    keep = tmp_path / "keep.mp4"
+    skip = tmp_path / "skip.mp4"
+    keep.write_bytes(b"x")
+    skip.write_bytes(b"x")
+    with state.lock:
+        state.config_data["excluded_files"] = [str(skip)]
+    with patch("web_app.probe_media", return_value=MediaInfo(width=10, height=10, fps=30, duration=5.0, has_audio=True)):
+        data = client.post("/api/scan", json={"input_path": str(tmp_path)}).json()
+    assert data["count"] == 2 and data["active_count"] == 1
+    assert {f["filename"]: f["excluded"] for f in data["files"]} == {"keep.mp4": False, "skip.mp4": True}
+    assert data["total_duration"] == 5.0
+
+    from supercut.pipeline import SuperCutPipeline
+    from supercut.models import JobConfig
+    pipe = SuperCutPipeline(JobConfig(keywords=["a"], excluded_files=[str(skip)]))
+    assert [Path(f).name for f in pipe.scan_video_inputs(str(tmp_path))] == ["keep.mp4"]
+    with state.lock:
+        state.config_data["excluded_files"] = []

@@ -148,6 +148,7 @@ class SuperCutPipeline:
     # ------------------------------------------------------------------
     def scan_video_inputs(self, input_path_str: str) -> List[str]:
         p = Path(input_path_str)
+        excluded = {os.path.normcase(os.path.abspath(x)) for x in getattr(self.config, "excluded_files", []) or []}
         if p.is_file():
             return [str(p)]
         elif p.is_dir():
@@ -156,7 +157,13 @@ class SuperCutPipeline:
                 files.extend(glob.glob(os.path.join(str(p), ext)))
                 files.extend(glob.glob(os.path.join(str(p), ext.upper())))
             unique = sorted(set(files), key=lambda s: s.lower())
-            return [f for f in unique if not Path(f).name.startswith("FINAL_BATCH_")]
+            kept = [f for f in unique if not Path(f).name.startswith("FINAL_BATCH_")]
+            if excluded:
+                skipped = [f for f in kept if os.path.normcase(os.path.abspath(f)) in excluded]
+                if skipped:
+                    self.log(f"Skipping {len(skipped)} file(s) you removed from the selection", "info")
+                kept = [f for f in kept if os.path.normcase(os.path.abspath(f)) not in excluded]
+            return kept
         return []
 
     def _build_matcher(self, keywords: Sequence[str]) -> KeywordMatcher:

@@ -301,6 +301,7 @@
             <span>Elapsed <b id="setup-elapsed-timer" class="text-cyan">00:00</b></span>
             <span id="setup-eta"></span>
             <button class="btn btn-ghost small" onclick="saveCurrentConfig(true)">Save settings</button>
+            <button id="btn-reset-session" class="btn small" onclick="resetSession()" title="Forget the current analysis and results and start a fresh job">Start over</button>
           </div>
         </div>
       </div>
@@ -335,6 +336,7 @@
             <span></span>
             <div class="row gap-s">
               <label class="check small"><input type="checkbox" id="log-autoscroll" checked><span>Auto-scroll</span></label>
+              <button class="btn small" onclick="copyLog()" title="Copy the whole log to the clipboard">Copy log</button>
               <button class="btn btn-ghost small" onclick="clearLog()">Clear</button>
             </div>
           </div>
@@ -560,6 +562,7 @@
             </div>
           </div>
           <div class="row gap wrap">
+            <button class="btn" onclick="resetSession()">Start over (clear analysis &amp; results)</button>
             <button class="btn" onclick="openSystemModal()">System &amp; diagnostics</button>
             <button class="btn btn-danger-ghost" onclick="clearTranscriptCache()" title="Transcripts are cached per file so re-running with new keywords is instant. Clear to force re-transcription.">Clear transcript cache</button>
             <button class="btn" onclick="openPath(systemInfo && systemInfo.app ? systemInfo.app.logs_dir : '')">Open logs folder</button>
