@@ -174,9 +174,12 @@ class TestLiveMediaEndToEnd(unittest.TestCase):
         self.assertEqual(result.total_clips_count, 2)
         self.assertGreater(result.total_clip_footage_sec, 0.5)
 
-        # 7. Probe Individual Extracted Clips (9:16 Vertical)
-        clips_a_dir = os.path.join(self.output_dir, "alpha_lecture_clips")
-        clips_b_dir = os.path.join(self.output_dir, "beta_keynote_clips")
+        # 7. Probe Individual Extracted Clips (9:16 Vertical) - every render lives in its own job folder
+        job_dir = result.output_dir
+        self.assertTrue(os.path.isdir(job_dir))
+        self.assertNotEqual(os.path.normcase(job_dir), os.path.normcase(self.output_dir))
+        clips_a_dir = os.path.join(job_dir, "clips", "alpha_lecture")
+        clips_b_dir = os.path.join(job_dir, "clips", "beta_keynote")
         self.assertTrue(os.path.isdir(clips_a_dir))
         self.assertTrue(os.path.isdir(clips_b_dir))
 
@@ -193,15 +196,17 @@ class TestLiveMediaEndToEnd(unittest.TestCase):
         self.assertGreater(probe_clip.duration, 0.5)
 
         # 8. Verify Thumbnails Generated
-        thumbs_a = [os.path.join(clips_a_dir, f) for f in os.listdir(clips_a_dir) if f.endswith(".jpg")]
-        thumbs_b = [os.path.join(clips_b_dir, f) for f in os.listdir(clips_b_dir) if f.endswith(".jpg")]
+        thumbs_a_dir = os.path.join(job_dir, "extras", "thumbnails", "alpha_lecture")
+        thumbs_b_dir = os.path.join(job_dir, "extras", "thumbnails", "beta_keynote")
+        thumbs_a = [os.path.join(thumbs_a_dir, f) for f in os.listdir(thumbs_a_dir) if f.endswith(".jpg")]
+        thumbs_b = [os.path.join(thumbs_b_dir, f) for f in os.listdir(thumbs_b_dir) if f.endswith(".jpg")]
         self.assertEqual(len(thumbs_a), 1)
         self.assertEqual(len(thumbs_b), 1)
         self.assertGreater(os.path.getsize(thumbs_a[0]), 500)
 
         # 9. Verify Per-Video Highlight Stitched Files
-        stitched_a = os.path.join(self.output_dir, "alpha_lecture_stitched.mp4")
-        stitched_b = os.path.join(self.output_dir, "beta_keynote_stitched.mp4")
+        stitched_a = os.path.join(job_dir, "highlights", "alpha_lecture_stitched.mp4")
+        stitched_b = os.path.join(job_dir, "highlights", "beta_keynote_stitched.mp4")
         self.assertTrue(os.path.exists(stitched_a))
         self.assertTrue(os.path.exists(stitched_b))
 
@@ -212,6 +217,8 @@ class TestLiveMediaEndToEnd(unittest.TestCase):
         # 10. Verify Master Batch Supercut
         self.assertIsNotNone(result.batch_output_file)
         self.assertTrue(os.path.exists(result.batch_output_file))
+        self.assertEqual(os.path.dirname(result.batch_output_file), job_dir)  # master sits at the job root
+        self.assertTrue(result.batch_output_file.endswith("_SuperCut.mp4"))
         probe_batch = probe_media(result.batch_output_file)
         self.assertTrue(probe_batch.is_valid)
         self.assertEqual(probe_batch.width, 1080)
@@ -219,8 +226,8 @@ class TestLiveMediaEndToEnd(unittest.TestCase):
         self.assertGreater(probe_batch.duration, 1.0)
 
         # 11. Verify Subtitles (.srt & .ass)
-        srt_a = os.path.join(self.output_dir, "alpha_lecture_stitched.srt")
-        ass_a = os.path.join(self.output_dir, "alpha_lecture_stitched.ass")
+        srt_a = os.path.join(job_dir, "extras", "alpha_lecture_stitched.srt")
+        ass_a = os.path.join(job_dir, "extras", "alpha_lecture_stitched.ass")
         self.assertTrue(os.path.exists(srt_a))
         self.assertTrue(os.path.exists(ass_a))
         with open(srt_a, "r", encoding="utf-8") as f:
@@ -232,8 +239,8 @@ class TestLiveMediaEndToEnd(unittest.TestCase):
             self.assertIn("QUANTUM", ass_content.upper())
 
         # 12. Verify NLE Exports (EDL & XML)
-        xml_a = os.path.join(self.output_dir, "alpha_lecture_timeline.xml")
-        edl_a = os.path.join(self.output_dir, "alpha_lecture_timeline.edl")
+        xml_a = os.path.join(job_dir, "extras", "alpha_lecture_timeline.xml")
+        edl_a = os.path.join(job_dir, "extras", "alpha_lecture_timeline.edl")
         self.assertTrue(os.path.exists(xml_a))
         self.assertTrue(os.path.exists(edl_a))
 

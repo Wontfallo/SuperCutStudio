@@ -97,6 +97,80 @@ def safe_stem(text: str, max_len: int = 90) -> str:
     return (stem or "clip")[:max_len]
 
 
+def _clean_stem(name: str) -> str:
+    return re.sub(r"[_+]", " ", Path(name).stem).strip()
+
+
+def _word_prefix(stems: Sequence[str]) -> str:
+    """Longest shared prefix of the stems, cut back to whole words and stripped of separators."""
+    if not stems:
+        return ""
+    prefix = os.path.commonprefix(list(stems))
+    if not prefix:
+        return ""
+    # If the prefix stops in the middle of a word (next char in some stem is a letter/digit), drop that partial word.
+    ends_mid_word = any(len(st) > len(prefix) and st[len(prefix)].isalnum() and prefix and prefix[-1].isalnum() for st in stems)
+    if ends_mid_word:
+        cut = max(prefix.rfind(" "), prefix.rfind("-"), prefix.rfind("."))
+        prefix = prefix[:cut] if cut > 0 else ""
+    return prefix.strip(" -_.:|[](),")
+
+
+def _common_title(names: Sequence[str]) -> str:
+    """Shared title of a set of videos ("Princess Rene - X", "Princess Rene - Y" -> "Princess Rene").
+
+    Odd files that don't share the majority's first word (a stray download with a
+    different naming scheme) are ignored so they don't wipe out the shared title.
+    """
+    stems = [_clean_stem(n) for n in names if n]
+    stems = [st for st in stems if st]
+    if not stems:
+        return ""
+    if len(stems) == 1:
+        return stems[0].strip(" -_.")
+    title = _word_prefix(stems)
+    if len(title) >= 3:
+        return title
+    # Majority cluster by first word (case-insensitive)
+    groups: Dict[str, List[str]] = {}
+    for st in stems:
+        key = st.split()[0].lower() if st.split() else ""
+        groups.setdefault(key, []).append(st)
+    biggest = max(groups.values(), key=len)
+    if len(biggest) >= 2 and len(biggest) * 2 >= len(stems):
+        title = _word_prefix(biggest)
+        if len(title) >= 3:
+            return title
+    return ""
+
+
+def suggest_job_name(video_paths: Sequence[str], input_path: str = "", explicit: str = "") -> str:
+    """Folder / master name for a render: explicit name > shared video title > source folder name."""
+    if explicit and explicit.strip():
+        return safe_stem(explicit.strip(), 60)
+    title = _common_title(video_paths)
+    if len(title) >= 3:
+        return safe_stem(title, 60)
+    if input_path:
+        p = Path(input_path)
+        base = p.stem if p.is_file() else p.name
+        if base:
+            return safe_stem(base, 60)
+    return "SuperCut"
+
+
+def allocate_job_dir(root: str, job_name: str) -> str:
+    """Create ``root/job_name``; if it already exists, enumerate: ``job_name 1``, ``job_name 2``..."""
+    os.makedirs(root, exist_ok=True)
+    candidate = os.path.join(root, job_name)
+    n = 0
+    while os.path.exists(candidate) and (os.listdir(candidate) if os.path.isdir(candidate) else True):
+        n += 1
+        candidate = os.path.join(root, f"{job_name} {n}")
+    os.makedirs(candidate, exist_ok=True)
+    return candidate
+
+
 class SuperCutPipeline:
     """Master pipeline controller for SuperCut Studio Pro."""
 
@@ -395,8 +469,13 @@ class SuperCutPipeline:
         if start_time is None:
             start_time = time.perf_counter()
 
-        out_dir = os.path.abspath(self.config.output_dir)
-        os.makedirs(out_dir, exist_ok=True)
+        root_dir = os.path.abspath(self.config.output_dir)
+        job_name = suggest_job_name([s.path for s in all_stats], "", getattr(self.config, "output_name", ""))
+        out_dir = allocate_job_dir(root_dir, job_name)
+        highlights_dir = os.path.join(out_dir, "highlights")
+        clips_root = os.path.join(out_dir, "clips")
+        extras_dir = os.path.join(out_dir, "extras")
+        self.log(f"Output folder: {out_dir}", "info")
         artifacts: List[Artifact] = []
 
         media_infos = {s.path: s.info for s in all_stats if s.info}
@@ -429,7 +508,7 @@ class SuperCutPipeline:
 
             # Individual clips
             if self.config.save_individual_clips:
-                clips_dir = os.path.join(out_dir, f"{name_stem}_clips")
+                clips_dir = os.path.join(clips_root, name_stem)
                 os.makedirs(clips_dir, exist_ok=True)
                 n_clips = len(selected_clips)
                 for c_idx, clip in enumerate(selected_clips, start=1):
@@ -460,13 +539,14 @@ class SuperCutPipeline:
                     self.log(f"{Path(stats.path).name}: saved {stats.clips_saved_count} individual clip(s)", "ok")
 
                 if getattr(self.config, "generate_thumbnails", False) and not self._cancelled:
-                    thumbs = extract_batch_thumbnails(selected_clips, clips_dir, default_video_path=stats.path)
+                    thumbs = extract_batch_thumbnails(selected_clips, os.path.join(extras_dir, "thumbnails", name_stem), default_video_path=stats.path)
                     for t in thumbs:
                         artifacts.append(Artifact(t, "thumbnail", Path(t).name, stats.path))
 
             # Per-video highlight reel
             if (self.config.save_per_video_stitched or self.config.save_batch_stitched) and not self._cancelled:
-                stitched_file = os.path.join(out_dir, f"{name_stem}_stitched.mp4")
+                os.makedirs(highlights_dir, exist_ok=True)
+                stitched_file = os.path.join(highlights_dir, f"{name_stem}_stitched.mp4")
                 t0 = time.perf_counter()
                 ok = stitch_single_video_highlights(
                     video_path=stats.path,
@@ -480,6 +560,7 @@ class SuperCutPipeline:
                     progress_callback=lambda f, m: self.emit_progress(base_pct + step_pct * (0.4 + 0.6 * f), m),
                     cancel_check=self._cancel_check,
                     transcript_words=transcript_words,
+                    log=lambda level, msg: self.log(msg, level),
                 )
                 stats.encode_duration = time.perf_counter() - t0
                 if ok:
@@ -489,7 +570,8 @@ class SuperCutPipeline:
                     self.encoder_used = last_successful_encoder() or self.encoder_used
                     self.log(f"{Path(stats.path).name}: highlight reel rendered in {stats.encode_duration:.1f}s "
                              f"({len(selected_clips)} clips)", "ok")
-                    self._export_sidecars(stats, selected_clips, transcript_words, name_stem, out_dir, fps,
+                    os.makedirs(extras_dir, exist_ok=True)
+                    self._export_sidecars(stats, selected_clips, transcript_words, name_stem, extras_dir, fps,
                                           target_w, target_h, artifacts)
                 elif not self._cancelled:
                     stats.failed = True
@@ -497,7 +579,8 @@ class SuperCutPipeline:
                     self.log(f"{Path(stats.path).name}: stitching failed", "err")
 
             if getattr(self.config, "contact_sheet", False) and not self._cancelled and selected_clips:
-                sheet = os.path.join(out_dir, f"{name_stem}_contact_sheet.jpg")
+                os.makedirs(extras_dir, exist_ok=True)
+                sheet = os.path.join(extras_dir, f"{name_stem}_contact_sheet.jpg")
                 try:
                     if generate_contact_sheet(selected_clips, sheet, video_path=stats.path,
                                               header_title=f"{Path(stats.path).name} - {len(selected_clips)} clips"):
@@ -508,7 +591,7 @@ class SuperCutPipeline:
         # Master batch
         stitched_candidates = [s.stitched_output_path for s in all_stats if s.stitched_output_path]
         batch_file = None
-        batch_name = (safe_stem(self.config.output_name) + ".mp4") if getattr(self.config, "output_name", "") else "FINAL_BATCH_SUPERCUT.mp4"
+        batch_name = f"{job_name}_SuperCut.mp4"
 
         if self.config.save_batch_stitched and stitched_candidates and not self._cancelled:
             if len(stitched_candidates) > 1:
@@ -520,11 +603,14 @@ class SuperCutPipeline:
                     progress_callback=lambda f, m: self.emit_progress(90.0 + f * 8.0, m),
                     cancel_check=self._cancel_check,
                     output_name=batch_name,
+                    log=lambda level, msg: self.log(msg, level),
                 )
                 if batch_file:
-                    self.log(f"Master batch supercut: {Path(batch_file).name}", "ok")
-            elif not self.config.save_per_video_stitched or getattr(self.config, "output_name", ""):
-                # Single source: promote the highlight reel to the master output name.
+                    self.log(f"Master SuperCut: {Path(batch_file).name}", "ok")
+                elif not self._cancelled:
+                    self.log("Master SuperCut was NOT produced - see the warnings above", "err")
+            else:
+                # Single source: the master is that reel, named as the master at the job root.
                 target = os.path.join(out_dir, batch_name)
                 try:
                     if self.config.save_per_video_stitched:
@@ -542,8 +628,6 @@ class SuperCutPipeline:
                 except OSError as exc:
                     self.log(f"Could not rename master output: {exc}", "warn")
                     batch_file = stitched_candidates[0]
-            else:
-                batch_file = None  # single per-video reel already is the result
 
         if batch_file and batch_file not in [a.path for a in artifacts]:
             artifacts.insert(0, Artifact(batch_file, "master", "Master SuperCut", ""))
@@ -563,8 +647,9 @@ class SuperCutPipeline:
                 artifacts[:] = [a for a in artifacts if a.path != sf]
 
         # Reports
-        report_json = os.path.join(out_dir, "supercut_report.json")
-        report_csv = os.path.join(out_dir, "supercut_report.csv")
+        os.makedirs(extras_dir, exist_ok=True)
+        report_json = os.path.join(extras_dir, "supercut_report.json")
+        report_csv = os.path.join(extras_dir, "supercut_report.csv")
         try:
             export_job_report_json(all_stats, report_json)
             export_job_report_csv(all_stats, report_csv)
@@ -665,4 +750,4 @@ class SuperCutPipeline:
         return self.render_clips_and_stitch(stats, start_time=start_time)
 
 
-__all__ = ["Artifact", "JobResult", "PipelineCancelled", "SuperCutPipeline", "VIDEO_EXTENSIONS", "safe_stem"]
+__all__ = ["Artifact", "JobResult", "PipelineCancelled", "SuperCutPipeline", "VIDEO_EXTENSIONS", "allocate_job_dir", "safe_stem", "suggest_job_name"]

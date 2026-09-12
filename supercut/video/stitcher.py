@@ -256,6 +256,19 @@ def _write_burn_in_subtitles(
 # Per-video highlight reel
 # ---------------------------------------------------------------------------
 
+LogFn = Callable[[str, str], None]
+
+
+def _log(log: Optional[LogFn], level: str, msg: str) -> None:
+    if log:
+        try:
+            log(level, msg)
+            return
+        except Exception:
+            pass
+    print(f"{level.upper()}: {msg}")
+
+
 def stitch_single_video_highlights(
     video_path: str,
     media_info: MediaInfo,
@@ -268,6 +281,7 @@ def stitch_single_video_highlights(
     progress_callback: Optional[Callable[[float, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     transcript_words: Optional[Sequence[Word]] = None,
+    log: Optional[LogFn] = None,
 ) -> bool:
     """Stitch all selected keyword intervals of a single source video into one highlight reel."""
     selected_clips = [c for c in intervals if c.selected and c.duration > 0.05]
@@ -293,7 +307,7 @@ def stitch_single_video_highlights(
             try:
                 sub_basename = _write_burn_in_subtitles(selected_clips, config, out_dir, transcript_words, target_w, target_h)
             except Exception as exc:
-                print(f"WARNING: Failed to setup subtitle burn-in: {exc}")
+                _log(log, "warn", f"Failed to set up subtitle burn-in: {exc}")
                 sub_basename = None
 
         strategies = [use_fast_seek, False] if use_fast_seek else [False]
@@ -351,7 +365,7 @@ def stitch_single_video_highlights(
                     if cancel_check and cancel_check():
                         return False
                     if err.strip():
-                        print(f"WARNING: Encoder {label} failed: {err.strip().splitlines()[-1]}")
+                        _log(log, "warn", f"{name}: encoder {label} failed: {err.strip().splitlines()[-1][:300]}")
     finally:
         if sub_basename:
             _remove_quiet(os.path.join(out_dir, sub_basename))
@@ -370,6 +384,7 @@ def stitch_master_batch(
     progress_callback: Optional[Callable[[float, str], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     output_name: str = "FINAL_BATCH_SUPERCUT.mp4",
+    log: Optional[LogFn] = None,
 ) -> Optional[str]:
     """Join all per-video highlights into a master supercut montage."""
     valid_files = [f for f in stitched_files if os.path.isfile(f) and os.path.getsize(f) > 0]
@@ -403,14 +418,15 @@ def stitch_master_batch(
             if progress_callback:
                 progress_callback(frac, f"Batch joining {frac * 100:.0f}%")
 
-        code, _ = run_ffmpeg_watched(copy_cmd, total_duration, handle_prog, cancel_check=cancel_check)
+        code, copy_err = run_ffmpeg_watched(copy_cmd, total_duration, handle_prog, cancel_check=cancel_check)
         if code == 0 and os.path.exists(final_output) and os.path.getsize(final_output) > 0:
             return final_output
         _remove_quiet(final_output)
         if cancel_check and cancel_check():
             return None
 
-        print("WARNING: Stream-copy concat failed; falling back to re-encode batch...")
+        tail = copy_err.strip().splitlines()[-1][:300] if copy_err.strip() else "no error output"
+        _log(log, "warn", f"Master stream-copy join failed ({tail}); re-encoding the master instead")
         for label, hwaccel, vcodec in get_encoder_attempts(config.encoder, _quality(config)):
             cmd = base_ffmpeg_cmd()
             if hwaccel:
@@ -423,9 +439,12 @@ def stitch_master_batch(
                 register_encoder_success((label, hwaccel, vcodec))
                 return final_output
             _remove_quiet(final_output)
+            if err.strip():
+                _log(log, "warn", f"Master re-encode with {label} failed: {err.strip().splitlines()[-1][:300]}")
             if cancel_check and cancel_check():
                 return None
 
+        _log(log, "err", "Master batch could not be produced with any encoder")
         return None
     finally:
         _remove_quiet(list_file)

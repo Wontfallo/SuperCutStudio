@@ -195,6 +195,7 @@ window.closeModals = closeModals; window.openShortcutsModal = openShortcutsModal
 async function loadSystemInfo(refresh) {
   try {
     systemInfo = await api('/api/system' + (refresh ? '?refresh=true' : ''));
+    document.body.classList.toggle('desktop', !!systemInfo.desktop);
     populateModelSelect();
     renderSystemModal();
     const stamp = $('build-stamp');
@@ -290,6 +291,18 @@ async function openPath(path) {
   try { await postJson('/api/open', { path }); } catch (err) { showToast('Could not open: ' + err.message, 'warning'); }
 }
 window.openPath = openPath;
+
+async function launchPath(path) {
+  if (!path) return;
+  try { await postJson('/api/launch', { path }); } catch (err) { showToast('Could not open file: ' + err.message, 'warning'); }
+}
+window.launchPath = launchPath;
+
+function launchPrimaryOutput() {
+  if (latestResult && latestResult.primary_output) launchPath(latestResult.primary_output);
+  else showToast('Nothing rendered yet.', 'warning');
+}
+window.launchPrimaryOutput = launchPrimaryOutput;
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -885,10 +898,19 @@ async function resetSession() {
     $('setup-completion-card').classList.add('hidden');
     const player = $('studio-video-player'); player.removeAttribute('src'); player.dataset.path = ''; player.load();
     updateScrubberUI(0, 0);
+    // Source selection is part of the session too: clear the path, file list and per-file exclusions (keywords stay).
+    scannedFiles = [];
+    $('input-path').value = '';
+    $('scanned-list').innerHTML = '';
+    $('scanned-assets-container').classList.add('hidden');
+    appConfig.excluded_files = [];
+    appConfig.input_path = '';
+    scheduleSave();
     updateTelemetry(0, 'Ready', 'IDLE', 0, null);
-    setJobRunning(false, 'Ready');
+    setJobRunning(false, 'Ready - session cleared');
     switchTab('setup');
-    showToast('Session cleared. Pick a source and run a new job.', 'success', 3000);
+    $('input-path').focus();
+    showToast('Session cleared: pick a new source. Keywords and settings were kept.', 'success', 3500);
   } catch (err) { showToast('Reset failed: ' + err.message, 'error'); }
 }
 window.resetSession = resetSession;
@@ -1821,8 +1843,8 @@ async function loadLatestResult() {
         <div class="kind ${a.kind}">${ARTIFACT_LABEL[a.kind] || 'FILE'}</div>
         <div class="info"><div class="n" title="${escapeHtml(a.path)}">${escapeHtml(a.label || a.filename)}</div><div class="m">${escapeHtml(a.filename)} · ${formatBytes(a.size_bytes)}</div></div>
         <div class="acts">
-          ${isMedia ? `<button class="btn btn-ghost small act-preview" title="Preview" data-path="${escapeHtml(a.path)}">▶</button>` : ''}
-          <a class="btn btn-ghost small" title="Download" href="/api/download?path=${encodeURIComponent(a.path)}" download>⤓</a>
+          ${isMedia ? `<button class="btn btn-ghost small act-preview" title="Preview here" data-path="${escapeHtml(a.path)}">▶</button>` : ''}
+          <button class="btn btn-ghost small act-launch" title="Open with default app" data-path="${escapeHtml(a.path)}">↗</button>
           <button class="btn btn-ghost small act-open" title="Show in folder" data-path="${escapeHtml(a.path)}">📁</button>
         </div>`;
       list.appendChild(el);
@@ -1839,6 +1861,8 @@ function initPathActionHandlers() {
   document.addEventListener('click', (e) => {
     const open = e.target.closest('.act-open');
     if (open && open.dataset.path) { e.preventDefault(); openPath(open.dataset.path); return; }
+    const launch = e.target.closest('.act-launch');
+    if (launch && launch.dataset.path) { e.preventDefault(); launchPath(launch.dataset.path); return; }
     const prev = e.target.closest('.act-preview');
     if (prev && prev.dataset.path) { e.preventDefault(); previewArtifact(prev.dataset.path); }
   });
@@ -1859,7 +1883,7 @@ async function loadJobHistory() {
     if (!d.jobs || d.jobs.length === 0) { box.innerHTML = '<div class="empty">No jobs yet this session.</div>'; return; }
     box.innerHTML = d.jobs.map((j) => {
       const when = new Date(j.finished_at * 1000).toLocaleTimeString();
-      const out = j.output ? `<span class="link act-open" data-path="${escapeHtml(j.output)}">${escapeHtml(j.output.split(/[\\/]/).pop())}</span>` : '<span class="dim">—</span>';
+      const out = j.output ? `<span class="link act-launch" title="Open with default app" data-path="${escapeHtml(j.output)}">${escapeHtml(j.output.split(/[\\/]/).pop())}</span>` : '<span class="dim">—</span>';
       return `<div class="history-item"><span class="k">${escapeHtml(j.kind)}</span><span class="mono dim">${when}</span><span>${j.clips} clips · ${j.hits} hits${j.keywords != null ? ' · ' + j.keywords + ' keywords' : ''}</span><span class="mono dim">${formatDuration(j.elapsed)}</span><span>${j.cancelled ? '<span class="text-rose">cancelled</span>' : out}</span></div>`;
     }).join('');
   } catch (_) {}

@@ -324,7 +324,8 @@
         </div>
         <div class="player-frame"><video id="setup-final-player" controls preload="metadata"></video></div>
         <div class="row gap wrap">
-          <a id="btn-setup-download-master" class="btn btn-primary" href="#" download>Download master video</a>
+          <button id="btn-setup-play-master" class="btn btn-primary" onclick="launchPrimaryOutput()">Open master video</button>
+          <a id="btn-setup-download-master" class="btn browser-only" href="#" download>Download master video</a>
           <button id="btn-setup-open-folder" class="btn" onclick="openResultFolder()">Open output folder</button>
         </div>
       </div>
@@ -509,10 +510,11 @@
           <div class="player-frame top-gap"><video id="final-video-player" controls preload="metadata"></video></div>
           <div class="stats-grid" id="result-stats"></div>
           <div class="row gap wrap top-gap">
-            <a id="btn-download-master" class="btn btn-primary" href="#" download>Download master (.mp4)</a>
-            <a id="btn-download-srt" class="btn" href="#" download>Subtitles (.srt)</a>
-            <a id="btn-download-report" class="btn" href="#" download>Report (.json)</a>
-            <button class="btn btn-ghost" onclick="openResultFolder()">Open output folder</button>
+            <button id="btn-play-master" class="btn btn-primary" onclick="launchPrimaryOutput()">▶ Open master video</button>
+            <button class="btn" onclick="openResultFolder()">📁 Open output folder</button>
+            <a id="btn-download-master" class="btn browser-only" href="#" download>Download master (.mp4)</a>
+            <a id="btn-download-srt" class="btn browser-only" href="#" download>Subtitles (.srt)</a>
+            <a id="btn-download-report" class="btn browser-only" href="#" download>Report (.json)</a>
           </div>
           <div class="divider"></div>
           <h4 class="small-title">Artifacts</h4>

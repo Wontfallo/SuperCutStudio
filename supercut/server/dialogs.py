@@ -134,8 +134,11 @@ def reveal_in_file_manager(path: str) -> bool:
         return False
     try:
         if os.name == "nt":
+            # NOTE: never use the hidden-window helpers here; Explorer is a GUI process and
+            # STARTF_USESHOWWINDOW + SW_HIDE would open its window invisibly.
             if os.path.isfile(path):
-                popen_hidden(["explorer", "/select,", os.path.normpath(path)])
+                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)],
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             elif os.path.isdir(path):
                 os.startfile(os.path.normpath(path))  # type: ignore[attr-defined]
             else:
@@ -150,4 +153,20 @@ def reveal_in_file_manager(path: str) -> bool:
         return False
 
 
-__all__ = ["pick_path", "register_native_picker", "reveal_in_file_manager"]
+def launch_file(path: str) -> bool:
+    """Open a file with the user's default application (video player, text editor, ...)."""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        if os.name == "nt":
+            os.startfile(os.path.normpath(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+        return True
+    except Exception:
+        return False
+
+
+__all__ = ["launch_file", "pick_path", "register_native_picker", "reveal_in_file_manager"]

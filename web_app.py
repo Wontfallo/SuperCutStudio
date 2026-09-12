@@ -56,8 +56,8 @@ from supercut.paths import (
     static_dir,
     uploads_dir,
 )
-from supercut.pipeline import JobResult, SuperCutPipeline, VIDEO_EXTENSIONS
-from supercut.server.dialogs import pick_path, reveal_in_file_manager
+from supercut.pipeline import JobResult, SuperCutPipeline, VIDEO_EXTENSIONS, allocate_job_dir, suggest_job_name
+from supercut.server.dialogs import launch_file, pick_path, reveal_in_file_manager
 from supercut.server.logging_setup import get_logger, setup_logging
 from supercut.server.sysinfo import system_report
 from supercut.video import export_transcript_srt, export_transcript_txt, probe_media, stitch_folder_direct
@@ -650,6 +650,21 @@ def open_in_explorer(req: OpenRequest):
     return {"status": "ok" if ok else "failed"}
 
 
+@app.post("/api/launch")
+def launch_with_default_app(req: OpenRequest):
+    """Open a rendered file with the default application (video player, editor...)."""
+    target = clean_path(req.path)
+    p = Path(target)
+    if not target or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    if p.suffix.lower() not in DOWNLOAD_SUFFIXES:
+        raise HTTPException(status_code=415, detail="File type not allowed")
+    if not state.is_media_allowed(p):
+        raise HTTPException(status_code=403, detail="Path not part of the current session.")
+    ok = launch_file(target)
+    return {"status": "ok" if ok else "failed"}
+
+
 # ---------------------------------------------------------------------------
 # SSE
 # ---------------------------------------------------------------------------
@@ -940,10 +955,13 @@ def start_stitch_folder_only(req: AnalyzeRequest):
     def worker():
         t0 = time.perf_counter()
         try:
-            out_name = (job_config.output_name.strip() + ".mp4") if job_config.output_name.strip() else "FINAL_BATCH_SUPERCUT.mp4"
+            job_name = suggest_job_name([], input_path, job_config.output_name)
+            job_dir = allocate_job_dir(os.path.abspath(out_dir), job_name)
+            out_name = f"{job_name}_Stitched.mp4"
+            state.broadcast_log("info", f"Output folder: {job_dir}")
             final_file = stitch_folder_direct(
                 folder_path=input_path,
-                output_dir=out_dir,
+                output_dir=job_dir,
                 config=job_config,
                 progress_callback=lambda p, m: _progress_dispatcher(p, m, stage="Folder Stitch"),
                 cancel_check=lambda: state.folder_stitch_cancelled,
@@ -965,7 +983,7 @@ def start_stitch_folder_only(req: AnalyzeRequest):
                 total_duration_sec=elapsed,
                 total_clips_count=1,
                 artifacts=[Artifact(final_file, "master", "Stitched folder video")],
-                output_dir=os.path.abspath(out_dir),
+                output_dir=job_dir,
             )
             with state.lock:
                 state.job_result = res
@@ -975,7 +993,7 @@ def start_stitch_folder_only(req: AnalyzeRequest):
             state.broadcast_log("ok", f"Final stitched video: {Path(final_file).name} ({elapsed:.1f}s)")
             state.broadcast_event("rendered", _result_payload(res))
             if job_config.open_folder_when_done:
-                reveal_in_file_manager(os.path.abspath(out_dir))
+                reveal_in_file_manager(job_dir)
         except Exception as e:
             log.exception("Folder stitch failed")
             state.fail_job("Folder stitch", str(e))
