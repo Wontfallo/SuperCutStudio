@@ -101,25 +101,43 @@ def _hf_cache_roots() -> List[Path]:
     return roots
 
 
+def crisper_cache_dir(shorthand: str = "turbo") -> Optional[Path]:
+    """Path of the cached CrisperWhisper snapshot directory, if any."""
+    repo_dir = f"models--nyralabs--CrisperWhisper2.0_{shorthand}"
+    for root in _hf_cache_roots():
+        cand = root / repo_dir
+        if cand.is_dir() and any(cand.rglob("config.json")):
+            return cand
+    return None
+
+
 def crisper_model_cached(shorthand: str = "turbo") -> bool:
     """True when the CrisperWhisper weights are already in the Hugging Face cache."""
-    repo_dir = f"models--nyralabs--CrisperWhisper2.0_{shorthand}"
-    return any((root / repo_dir).is_dir() for root in _hf_cache_roots())
+    return crisper_cache_dir(shorthand) is not None
 
 
-def crisper_worker_env() -> dict:
-    """Environment for the worker: offline when cached so transformers never
-    re-resolves the gated repo (which fails without a token and breaks processor loading)."""
+def crisper_worker_env(offline: Optional[bool] = None) -> dict:
+    """Environment for the worker.
+
+    Offline mode (when the model is cached) stops transformers from re-resolving the
+    gated repo, which fails without a token or without internet. ``offline`` forces
+    the mode; ``None`` picks offline when the cache is present.
+    """
     env = dict(os.environ)
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONUTF8", "1")
     env.pop("PYTHONPATH", None)
     env.pop("PYTHONHOME", None)
     env.setdefault("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
-    if crisper_model_cached("turbo"):
+    env["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    if offline is None:
+        offline = crisper_model_cached("turbo")
+    if offline:
         env["HF_HUB_OFFLINE"] = "1"
         env["TRANSFORMERS_OFFLINE"] = "1"
-        env["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    else:
+        env.pop("HF_HUB_OFFLINE", None)
+        env.pop("TRANSFORMERS_OFFLINE", None)
     return env
 
 
@@ -210,8 +228,60 @@ class CrisperWhisperBackend:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tf:
             tf.write(_WORKER_SCRIPT)
             script_path = tf.name
+        try:
+            return self._transcribe_with_retry(script_path, audio_path, media_path, fallback_duration,
+                                               progress_callback, cancel_check)
+        finally:
+            if os.path.exists(script_path):
+                try:
+                    os.remove(script_path)
+                except OSError:
+                    pass
 
-        env = crisper_worker_env()
+    def _transcribe_with_retry(
+        self,
+        script_path: str,
+        audio_path: str,
+        media_path: str,
+        fallback_duration: float,
+        progress_callback: Optional[Callable[[float, str], None]],
+        cancel_check: Optional[Callable[[], bool]],
+    ) -> Transcript:
+        cache_dir = crisper_cache_dir("turbo")
+        first_offline = cache_dir is not None
+        modes = [first_offline, not first_offline]
+        if progress_callback:
+            where = f"cache: {cache_dir}" if cache_dir else "model not in local cache, will download"
+            progress_callback(0.06, f"CrisperWhisper {'offline' if first_offline else 'online'} ({where})")
+        last_error: Optional[Exception] = None
+        for attempt, offline in enumerate(modes):
+            try:
+                return self._run_worker_once(script_path, audio_path, media_path, fallback_duration,
+                                             progress_callback, cancel_check, offline)
+            except RuntimeError as exc:
+                last_error = exc
+                msg = str(exc)
+                if "cancelled" in msg.lower() or (cancel_check and cancel_check()):
+                    raise
+                if attempt == 0:
+                    if progress_callback:
+                        progress_callback(0.08, f"CrisperWhisper {'offline' if offline else 'online'} attempt failed; retrying "
+                                                f"{'online' if offline else 'offline'}...")
+                    continue
+        assert last_error is not None
+        raise last_error
+
+    def _run_worker_once(
+        self,
+        script_path: str,
+        audio_path: str,
+        media_path: str,
+        fallback_duration: float,
+        progress_callback: Optional[Callable[[float, str], None]],
+        cancel_check: Optional[Callable[[], bool]],
+        offline: bool,
+    ) -> Transcript:
+        env = crisper_worker_env(offline=offline)
 
         # Generous timeout: model load + ~0.25x realtime on GPU, much slower on CPU.
         timeout = 900.0 + max(0.0, fallback_duration) * 1.5
@@ -292,12 +362,11 @@ class CrisperWhisperBackend:
             if timed_out:
                 raise RuntimeError(f"CrisperWhisper worker timed out after {timeout:.0f}s")
             if proc.returncode != 0:
-                lines = [ln for ln in stderr_tail if ln.strip()]
-                last = lines[-1] if lines else "no output"
-                hint = ""
-                if "Unrecognized processing class" in last or "processor" in last.lower():
-                    hint = " (model files could not be loaded from the Hugging Face cache; run once with internet access or check HF_HOME)"
-                raise RuntimeError(f"CrisperWhisper worker failed: {last}{hint}")
+                lines = [ln.strip() for ln in stderr_tail if ln.strip() and not ln.startswith(("  File ", "    ", "Traceback"))]
+                detail = " | ".join(lines[-4:]) if lines else "no output"
+                mode = "offline" if offline else "online"
+                hf_home = env.get("HF_HOME", "")
+                raise RuntimeError(f"CrisperWhisper worker failed ({mode} mode, HF_HOME={hf_home}): {detail}")
 
             stdout = "".join(stdout_lines)
             json_marker = "__JSON_START__\n"
@@ -327,11 +396,6 @@ class CrisperWhisperBackend:
             )
         finally:
             self._proc = None
-            if os.path.exists(script_path):
-                try:
-                    os.remove(script_path)
-                except OSError:
-                    pass
 
     # ------------------------------------------------------------------
     def _words_to_segments(self, words: List[Word], total_duration: float) -> List[Segment]:
