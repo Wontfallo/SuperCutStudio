@@ -145,7 +145,7 @@ async function runBrowserTests() {
     // Folder scan: remove / restore files
     window.fetch = ((orig) => async (url, opts) => {
         if (String(url) === '/api/scan') return json({ input_path: 'C:/vids', is_file: false, count: 2, active_count: 2, total_duration: 20, files: [{ path: 'C:/vids/a.mp4', filename: 'a.mp4', resolution: '1920x1080', duration: 10, fps: 30, has_audio: true, video_codec: 'h264', size_bytes: 10, readable: true, excluded: false }, { path: 'C:/vids/b.mp4', filename: 'b.mp4', resolution: '1920x1080', duration: 10, fps: 30, has_audio: true, video_codec: 'h264', size_bytes: 10, readable: true, excluded: false }] });
-        if (String(url) === '/api/reset') { fetchCalls.push({ url, opts }); return json({ status: 'ok' }); }
+        if (String(url) === '/api/reset') { fetchCalls.push({ url, opts }); serverClips.length = 0; return json({ status: 'ok' }); }
         return orig(url, opts);
     })(window.fetch);
     inputPath.value = 'C:/vids';
@@ -372,7 +372,8 @@ async function runBrowserTests() {
     assert(document.getElementById('btn-cancel').classList.contains('hidden'), 'Stop hidden after cancel');
     pass('SSE error and cancelled events reset the running UI with feedback');
 
-    // Start over clears the session
+    // Start over clears the session (let the cancelled-handler's clip reload settle first)
+    await tick(60);
     await window.resetSession();
     await tick(40);
     assert(fetchCalls.some((c) => c.url === '/api/reset'), '/api/reset called');
