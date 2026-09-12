@@ -109,12 +109,6 @@
           </div>
           <div id="keyword-chips" class="chips"></div>
 
-          <div class="label-row top-gap-s"><span>Clip shaping</span></div>
-          <div class="shaping-grid">
-            <label class="check" title="Grow each hit to the whole sentence it was spoken in, then add the padding below."><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence <small class="hint-inline">cut at sentence boundaries, then pad</small></span></label>
-            <label class="check" title="Instead of cutting exactly at the padded time, the cut slides to the nearest pause between words (within about 0.8 s) so clips never start or end mid-word."><input type="checkbox" id="setting-snap-silence" checked><span>Snap cuts to silence <small class="hint-inline">move each cut to the nearest pause so words aren't chopped</small></span></label>
-            <label class="check" title="Besides keyword hits, also detect stretches where the speaker talks unusually fast (about 3.5+ words per second) and add them as clips tagged 'high-energy'."><input type="checkbox" id="setting-high-energy"><span>Also cut fast, excited speech <small class="hint-inline">adds clips where talking speeds up, tagged high-energy</small></span></label>
-          </div>
           <div class="label-row top-gap-s"><span>Clip padding</span><span class="muted">seconds kept before / after each hit</span></div>
           <div class="sliders">
             <div class="slider-row">
@@ -125,6 +119,12 @@
               <label for="setting-post-pad">Post-pad <span id="post-pad-label" class="mono muted">1.0s</span></label>
               <input type="range" id="setting-post-pad" min="0" max="10" step="0.1" value="1">
             </div>
+          </div>
+          <div class="shaping-row">
+            <label class="check" title="Grow each hit to the whole sentence it was spoken in, then add the padding above."><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence</span></label>
+            <label class="check" title="Instead of cutting exactly at the padded time, each cut slides to the nearest pause between words (within about 0.8 s) so clips never start or end mid-word."><input type="checkbox" id="setting-snap-silence" checked><span>Snap cuts to silence</span></label>
+            <label class="check" title="Besides keyword hits, also detect stretches where the speaker talks unusually fast (about 3.5+ words per second) and add them as clips tagged high-energy."><input type="checkbox" id="setting-high-energy"><span>Also cut fast, excited speech</span></label>
+            <span class="dim tiny">hover for details</span>
           </div>
 
           <details class="drawer" id="drawer-matching">
