@@ -456,16 +456,21 @@ function openResultFolder() {
 }
 window.openResultFolder = openResultFolder;
 
-async function scanMediaSource() {
+let lastScannedPath = '';
+async function scanMediaSource(force = false) {
   const inputEl = $('input-path');
   const inputPath = sanitizePath(inputEl.value);
   inputEl.value = inputPath;
   if (!inputPath) { showToast('Enter a folder or video file path first.', 'warning'); return; }
+  if (!force && inputPath === lastScannedPath && scannedFiles.length) return;
+  lastScannedPath = inputPath;
 
   const scanBtn = $('btn-scan');
   const scanBtnText = $('btn-scan-text');
-  scanBtn.disabled = true;
+  if (scanBtn) scanBtn.disabled = true;
   if (scanBtnText) scanBtnText.textContent = 'Scanning…';
+  const container = $('scanned-assets-container');
+  if (container) { container.classList.remove('hidden'); $('scanned-list').innerHTML = '<div class="file-item"><span class="muted">Checking media…</span></div>'; }
   try {
     const data = await postJson('/api/scan', { input_path: inputPath });
     scannedFiles = data.files || [];
@@ -480,7 +485,7 @@ async function scanMediaSource() {
   } catch (err) {
     showToast('Scan failed: ' + err.message, 'error');
   } finally {
-    scanBtn.disabled = false;
+    if (scanBtn) scanBtn.disabled = false;
     if (scanBtnText) scanBtnText.textContent = 'Scan';
   }
 }

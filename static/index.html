@@ -70,9 +70,8 @@
             <button id="mode-file-btn" class="seg-btn" onclick="setInputMode('File')">Single file</button>
           </div>
           <input id="input-path" class="input mono grow" type="text" spellcheck="false"
-                 placeholder="e.g. C:\Videos\Highlights" onkeydown="if(event.key==='Enter'){scanMediaSource();}">
+                 placeholder="e.g. C:\Videos\Highlights" onkeydown="if(event.key==='Enter'){scanMediaSource();}" onchange="scanMediaSource()">
           <button id="btn-browse" class="btn" onclick="browseInput()" title="Open a native picker">Browse…</button>
-          <button id="btn-scan" class="btn btn-secondary" onclick="scanMediaSource()"><span id="btn-scan-text">Scan</span></button>
         </div>
         <div id="drop-zone" class="dropstrip">
           <input type="file" id="file-uploader" class="hidden" accept="video/*" onclick="event.stopPropagation()" onchange="handleFileUpload(event)">
