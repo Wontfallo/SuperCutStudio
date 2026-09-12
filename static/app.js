@@ -1051,8 +1051,10 @@ function updateFilterOptions() {
   const kwSel = $('clip-filter-keyword');
   const vidSel = $('clip-filter-video');
   const kwPrev = kwSel.value, vidPrev = vidSel.value;
-  const kws = [...new Set(detectedClips.flatMap((c) => c.keywords && c.keywords.length ? c.keywords : [c.primary_keyword]))].sort();
-  kwSel.innerHTML = '<option value="">All keywords</option>' + kws.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+  const kwCounts = new Map();
+  for (const c of detectedClips) for (const k of new Set((c.hits && c.hits.length) ? c.hits.map((h) => h.keyword) : (c.keywords || [c.primary_keyword]))) kwCounts.set(k, (kwCounts.get(k) || 0) + 1);
+  const kws = Array.from(kwCounts.keys()).sort();
+  kwSel.innerHTML = '<option value="">All keywords</option>' + kws.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(k)} (${kwCounts.get(k)} clip${kwCounts.get(k) === 1 ? '' : 's'})</option>`).join('');
   vidSel.innerHTML = '<option value="">All videos</option>' + clipVideos.map((v) => `<option value="${escapeHtml(v.video_path)}">${escapeHtml(v.filename)} (${v.clips})</option>`).join('');
   kwSel.value = kwPrev; vidSel.value = vidPrev;
 }
@@ -1064,7 +1066,7 @@ function visibleClips() {
   const selOnly = $('clip-filter-selected').checked;
   const sort = $('clip-sort').value;
   let list = detectedClips.filter((c) => {
-    if (kw && !(c.keywords || [c.primary_keyword]).includes(kw)) return false;
+    if (kw && !((c.hits && c.hits.length) ? c.hits.some((h) => h.keyword === kw) : (c.keywords || [c.primary_keyword]).includes(kw))) return false;
     if (vid && c.video_path !== vid) return false;
     if (selOnly && !c.selected) return false;
     if (q && !(`${c.matched_text} ${c.primary_keyword} ${c.custom_title || ''}`.toLowerCase().includes(q))) return false;
@@ -1100,18 +1102,26 @@ function renderClipsTable() {
     tr.id = `clip-row-${globalIdx}`;
     const badgeClass = clip.is_high_energy ? 'energy' : (clip.manual ? 'manual' : '');
     const conf = clip.confidence != null ? clip.confidence : 1;
-    const hitCount = (clip.hits || []).length;
-    const kws = (clip.keywords && clip.keywords.length ? clip.keywords : [clip.primary_keyword]);
-    const kwLabel = clip.custom_title || kws[0];
-    const extraKws = kws.length > 1 ? `<span class="kw-more" title="${escapeHtml(kws.join(', '))}">+${kws.length - 1} more</span>` : '';
+    // One badge per keyword found inside this clip, with its hit count; the filtered keyword goes first.
+    const hits = clip.hits || [];
+    const counts = new Map();
+    for (const h of hits) counts.set(h.keyword, (counts.get(h.keyword) || 0) + 1);
+    if (counts.size === 0) counts.set(clip.primary_keyword, 1);
+    const kwFilter = $('clip-filter-keyword').value;
+    const kwEntries = Array.from(counts.entries()).sort((a, b) => (a[0] === kwFilter ? -1 : b[0] === kwFilter ? 1 : b[1] - a[1]));
+    const badges = clip.custom_title
+      ? `<span class="kw-badge ${badgeClass}" title="${escapeHtml(kwEntries.map(([k, n]) => `${k} ×${n}`).join(', '))}">${escapeHtml(clip.custom_title)}</span>`
+      : kwEntries.map(([k, n]) => `<span class="kw-badge ${badgeClass} ${k === kwFilter ? 'kw-active' : ''}">${escapeHtml(k)}${n > 1 ? `<span class="kw-hits">×${n}</span>` : ''}</span>`).join(' ');
+    const matchedList = hits.filter((h) => !kwFilter || h.keyword === kwFilter).map((h) => h.matched_text).filter(Boolean);
+    const matchedText = matchedList.length ? matchedList.slice(0, 3).join(' · ') + (matchedList.length > 3 ? ` · +${matchedList.length - 3}` : '') : (clip.matched_text || '');
     tr.dataset.idx = String(globalIdx);
     tr.innerHTML = `
       <td class="stop"><input type="checkbox" class="clip-use" ${clip.selected ? 'checked' : ''} data-idx="${globalIdx}"></td>
       <td class="mono muted">${clip.clip_index}</td>
-      <td><span class="kw-badge ${badgeClass}">${escapeHtml(kwLabel)}</span>${hitCount > 1 ? `<span class="kw-hits" title="${hitCount} keyword hits inside this clip">×${hitCount}</span>` : ''}${extraKws}${multiVideo ? `<div class="tiny dim ellipsis" style="max-width:150px" title="${escapeHtml(clip.video_filename)}">${escapeHtml(clip.video_filename)}</div>` : ''}</td>
+      <td><div class="kw-badges">${badges}</div>${multiVideo ? `<div class="tiny dim ellipsis" style="max-width:190px" title="${escapeHtml(clip.video_filename)}">${escapeHtml(clip.video_filename)}</div>` : ''}</td>
       <td class="mono">${formatShort(clip.start)} → ${formatShort(clip.end)}</td>
       <td class="mono text-green">${clip.duration.toFixed(2)}s</td>
-      <td><span class="matched" title="${escapeHtml(clip.matched_text)}">${escapeHtml(clip.matched_text || '')}</span> <span class="conf ${conf < 0.6 ? 'low' : ''}" title="ASR confidence">${Math.round(conf * 100)}%</span></td>
+      <td><span class="matched" title="${escapeHtml(hits.map((h) => h.matched_text).join(' · '))}">${escapeHtml(matchedText)}</span> <span class="conf ${conf < 0.6 ? 'low' : ''}" title="ASR confidence">${Math.round(conf * 100)}%</span></td>
       <td class="right stop">
         <button class="btn small clip-audition" data-idx="${globalIdx}">▶ Audition</button>
         <button class="btn btn-ghost small clip-delete" title="Delete clip" data-idx="${globalIdx}">✕</button>

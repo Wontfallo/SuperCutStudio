@@ -682,3 +682,8 @@ kbd { background: #333; border-color: #6a6a6a; color: #fff; }
 
 .check.disabled { opacity: .45; cursor: not-allowed; }
 .check.disabled input { cursor: not-allowed; }
+
+.kw-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw-badge .kw-hits { margin-left: 4px; }
+.kw-badge.kw-active { background: var(--cyan); color: #000; }
+.kw-badge.kw-active .kw-hits { color: #000; }
