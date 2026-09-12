@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 from typing import Callable, List, Optional
+from ..procs import popen_hidden, run_hidden
 
 VIDEO_FILTER = "Video Files|*.mp4;*.mkv;*.avi;*.mov;*.webm;*.m4v;*.ts;*.wmv;*.flv|All Files|*.*"
 
@@ -61,14 +62,13 @@ def _powershell_pick(kind: str, title: str, initial: str) -> Optional[str]:
             "if ($r -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.FileName }"
         )
     try:
-        res = subprocess.run(
+        res = run_hidden(
             ["powershell", "-NoProfile", "-STA", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
             timeout=600,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         out = (res.stdout or "").strip()
         return out or None
@@ -135,7 +135,7 @@ def reveal_in_file_manager(path: str) -> bool:
     try:
         if os.name == "nt":
             if os.path.isfile(path):
-                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+                popen_hidden(["explorer", "/select,", os.path.normpath(path)])
             elif os.path.isdir(path):
                 os.startfile(os.path.normpath(path))  # type: ignore[attr-defined]
             else:

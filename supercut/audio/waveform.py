@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from ..paths import ffmpeg_path, waveform_cache_dir
+from ..procs import run_hidden
 
 SAMPLE_RATE = 8000
 
@@ -48,7 +49,7 @@ def _decode_pcm(media_path: str, timeout: float) -> bytes:
         "pcm_s16le",
         "pipe:1",
     ]
-    res = subprocess.run(cmd, capture_output=True, timeout=timeout)
+    res = run_hidden(cmd, capture_output=True, timeout=timeout)
     if res.returncode != 0:
         return b""
     return res.stdout

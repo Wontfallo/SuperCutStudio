@@ -21,6 +21,7 @@ from typing import Callable, List, Optional
 
 from ..models import Segment, Transcript, Word
 from ..paths import app_root
+from ..procs import popen_hidden, run_hidden
 
 CRISPER_MODEL_NAME = "crisper-turbo"
 CRISPER_RUNTIME_ENV = "VKS_CRISPER_PYTHON"
@@ -53,12 +54,11 @@ print(json.dumps(out), flush=True)
 
 def _python_has_crisper(python_path: Path) -> bool:
     try:
-        result = subprocess.run(
+        result = run_hidden(
             [str(python_path), "-c", "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('crisperwhisper') else 1)"],
             capture_output=True,
             text=True,
             timeout=30,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
         )
         return result.returncode == 0
     except Exception:
@@ -125,7 +125,7 @@ class CrisperWhisperBackend:
         if proc and proc.poll() is None:
             try:
                 if os.name == "nt":
-                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+                    run_hidden(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
                 else:
                     proc.terminate()
             except Exception:
@@ -194,7 +194,7 @@ class CrisperWhisperBackend:
 
         try:
             cmd = [str(self.crisper_python), "-u", script_path, audio_path, self.language or "auto"]
-            proc = subprocess.Popen(
+            proc = popen_hidden(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -203,7 +203,6 @@ class CrisperWhisperBackend:
                 encoding="utf-8",
                 errors="replace",
                 env=env,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
             )
             self._proc = proc
 

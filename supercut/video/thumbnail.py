@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from ..models import ClipInterval
 from ..paths import ffmpeg_path
 from .probe import probe_media
+from ..procs import run_hidden
 
 
 def extract_clip_thumbnail(
@@ -80,7 +81,7 @@ def extract_clip_thumbnail(
     ]
 
     try:
-        res = subprocess.run(
+        res = run_hidden(
             cmd,
             capture_output=True,
             text=True,

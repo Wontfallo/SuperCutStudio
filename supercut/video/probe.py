@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 
 from ..models import MediaInfo
 from ..paths import ffprobe_path
+from ..procs import run_hidden
 
 
 def probe_media(file_path: str) -> Optional[MediaInfo]:
@@ -26,7 +27,7 @@ def probe_media(file_path: str) -> Optional[MediaInfo]:
     ]
 
     try:
-        res = subprocess.run(
+        res = run_hidden(
             cmd,
             capture_output=True,
             text=True,

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..paths import ffmpeg_path
+from ..procs import run_hidden
 
 
 def extract_audio_for_asr(video_path: str, output_wav_path: Optional[str] = None) -> Optional[str]:
@@ -38,7 +39,7 @@ def extract_audio_for_asr(video_path: str, output_wav_path: Optional[str] = None
     ]
 
     try:
-        res = subprocess.run(
+        res = run_hidden(
             cmd,
             capture_output=True,
             text=True,

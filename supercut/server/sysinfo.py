@@ -22,16 +22,16 @@ from ..paths import (
     logs_dir,
 )
 from ..video import probe_available_encoders
+from ..procs import run_hidden
 
 
 def gpu_name() -> Optional[str]:
     try:
-        res = subprocess.run(
+        res = run_hidden(
             ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
             capture_output=True,
             text=True,
             timeout=6,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
         )
         if res.returncode == 0 and res.stdout.strip():
             return res.stdout.strip().splitlines()[0].strip()

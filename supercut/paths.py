@@ -175,7 +175,9 @@ def ffmpeg_version() -> Optional[str]:
     import subprocess
 
     try:
-        res = subprocess.run(
+        from .procs import run_hidden
+
+        res = run_hidden(
             [ffmpeg_path(), "-version"],
             capture_output=True,
             text=True,

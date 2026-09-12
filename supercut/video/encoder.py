@@ -11,6 +11,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from ..models import EncoderChoice, QualityPreset
 from ..paths import ffmpeg_path
+from ..procs import hidden_kwargs, run_hidden
 
 AUDIO_AAC_ARGS = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
 
@@ -100,7 +101,7 @@ def is_nvenc_available(codec: str = "h264_nvenc", force_probe: bool = False) -> 
             "null",
             "-",
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        res = run_hidden(cmd, capture_output=True, text=True, timeout=8)
         supported = (res.returncode == 0)
     except Exception:
         supported = False
@@ -214,7 +215,7 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
     if proc.poll() is not None:
         return
     if os.name == "nt":
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, text=True)
+        run_hidden(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, text=True)
     else:
         proc.terminate()
     try:
@@ -224,11 +225,8 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
 
 
 def _popen_kwargs() -> dict:
-    kw: dict = {}
-    if os.name == "nt":
-        # Hide the console window of child processes when running the GUI build.
-        kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    return kw
+    # Hide the console window of child processes when running the GUI build.
+    return hidden_kwargs()
 
 
 def run_ffmpeg_watched(
