@@ -38,3 +38,6 @@ confusing.png
 
 # Local settings
 settings.json
+
+# Written by the build script
+static/build_info.json

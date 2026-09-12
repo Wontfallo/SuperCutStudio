@@ -40,17 +40,35 @@ def gpu_name() -> Optional[str]:
     return None
 
 
-def build_stamp() -> str:
-    """When this copy of the app was built (exe mtime when frozen, 'dev' from source)."""
-    import datetime
+def build_info() -> Dict[str, str]:
+    """Version / commit / build time written by build_installer.ps1 (or 'dev' from source)."""
+    import json
 
-    if is_frozen():
+    from ..paths import static_dir
+
+    info = {"version": __version__, "commit": "", "built": ""}
+    try:
+        with open(static_dir() / "build_info.json", "r", encoding="utf-8-sig") as f:
+            data = json.load(f)
+        info.update({k: str(v) for k, v in data.items() if k in info})
+    except Exception:
+        pass
+    if not info["built"] and is_frozen():
+        import datetime
+
         try:
-            ts = os.path.getmtime(sys.executable)
-            return datetime.datetime.fromtimestamp(ts).strftime("%b %d %H:%M")
+            info["built"] = datetime.datetime.fromtimestamp(os.path.getmtime(sys.executable)).strftime("%Y-%m-%d %H:%M")
         except OSError:
-            return "unknown"
-    return "dev"
+            pass
+    return info
+
+
+def build_stamp() -> str:
+    info = build_info()
+    if not is_frozen() and not info["commit"]:
+        return "dev"
+    parts = [p for p in (info["commit"], info["built"]) if p]
+    return " · ".join(parts) if parts else "unknown"
 
 
 _STARTED_AT = __import__("time").time()
@@ -71,6 +89,7 @@ def system_report(probe_encoders: bool = True) -> Dict[str, Any]:
             "logs_dir": str(logs_dir()),
             "default_output_dir": str(default_output_dir()),
             "build": build_stamp(),
+            "build_info": build_info(),
             "started_at": _STARTED_AT,
             "pid": os.getpid(),
         },

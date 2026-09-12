@@ -1367,15 +1367,43 @@ def clear_transcript_cache():
     return {"status": "ok", "removed": removed}
 
 
+def stop_everything() -> None:
+    """Cancel the running job and make sure no ffmpeg / worker child outlives the app."""
+    try:
+        with state.lock:
+            state.folder_stitch_cancelled = True
+            if state.current_pipeline:
+                state.current_pipeline.cancel()
+    except Exception:
+        pass
+    try:
+        from supercut.procs import run_hidden
+        if os.name == "nt":
+            # Children were started with our PID as parent; taskkill /T takes the whole tree except us.
+            for name in ("ffmpeg.exe", "ffprobe.exe"):
+                run_hidden(["taskkill", "/F", "/FI", f"IMAGENAME eq {name}", "/FI", f"PARENTPID eq {os.getpid()}"],
+                           capture_output=True, timeout=10)
+    except Exception:
+        pass
+    try:
+        from supercut.paths import data_dir
+        inst = data_dir() / "instance.json"
+        if inst.exists():
+            inst.unlink()
+    except Exception:
+        pass
+
+
 @app.post("/api/shutdown")
 def shutdown_server(request: Request):
-    """Stop the server (desktop shell only, guarded by a token)."""
+    """Stop the server (desktop shell or a newer instance taking over), guarded by a token."""
     token = request.headers.get("x-shutdown-token", "")
     if not state.shutdown_token or token != state.shutdown_token:
         raise HTTPException(status_code=403, detail="Not allowed")
 
     def _stop():
         time.sleep(0.2)
+        stop_everything()
         os._exit(0)
 
     threading.Thread(target=_stop, daemon=True).start()

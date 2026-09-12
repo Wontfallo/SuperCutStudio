@@ -63,6 +63,117 @@ from supercut.server.logging_setup import get_logger, setup_logging  # noqa: E40
 log = get_logger("supercut.desktop")
 
 
+INSTANCE_FILE_NAME = "instance.json"
+
+
+def _instance_file():
+    from supercut.paths import data_dir
+
+    return data_dir() / INSTANCE_FILE_NAME
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+        if not h:
+            return False
+        ctypes.windll.kernel32.CloseHandle(h)
+        return True
+    except Exception:
+        return False
+
+
+def _takeover_previous_instance() -> bool:
+    """If an older copy of the app is still running, shut it down (unless it's mid-job).
+
+    Returns False when the old instance is busy and we must not start.
+    """
+    import json
+
+    f = _instance_file()
+    if not f.exists():
+        return True
+    try:
+        info = json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        f.unlink(missing_ok=True)
+        return True
+    pid, port, token = int(info.get("pid", 0)), int(info.get("port", 0)), str(info.get("token", ""))
+    if not pid or pid == os.getpid() or not _pid_alive(pid):
+        f.unlink(missing_ok=True)
+        return True
+    base = f"http://127.0.0.1:{port}"
+    try:
+        with urllib.request.urlopen(base + "/api/status", timeout=2) as resp:
+            status = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        # Process alive but not answering: stale shell, kill it.
+        _kill_pid(pid)
+        f.unlink(missing_ok=True)
+        return True
+    if status.get("status") in ("analyzing", "rendering", "stitching"):
+        started = time.strftime("%H:%M", time.localtime(float(info.get("started_at", time.time()))))
+        _message_box(f"SuperCut Studio is already running a job (copy started {started}).\n\n"
+                     "Let it finish or press Stop in that window, then launch again.")
+        return False
+    log.info("Shutting down previous instance pid %s on port %s", pid, port)
+    try:
+        req = urllib.request.Request(base + "/api/shutdown", method="POST", headers={"x-shutdown-token": token})
+        urllib.request.urlopen(req, timeout=3)
+    except Exception:
+        pass
+    for _ in range(40):
+        if not _pid_alive(pid):
+            break
+        time.sleep(0.25)
+    else:
+        _kill_pid(pid)
+    f.unlink(missing_ok=True)
+    return True
+
+
+def _kill_pid(pid: int) -> None:
+    try:
+        from supercut.procs import run_hidden
+
+        run_hidden(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=10)
+    except Exception:
+        pass
+
+
+def _write_instance_file(port: int) -> None:
+    import json
+
+    try:
+        _instance_file().write_text(json.dumps({
+            "pid": os.getpid(), "port": port, "token": os.environ.get("VKS_SHUTDOWN_TOKEN", ""),
+            "started_at": time.time(), "version": __version__,
+        }), encoding="utf-8")
+    except Exception as exc:
+        log.warning("Could not write instance file: %s", exc)
+
+
+def _message_box(text: str) -> None:
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, text, APP_NAME, 0x30)
+    except Exception:
+        print(text)
+
+
+def _cleanup_on_exit() -> None:
+    try:
+        import web_app
+
+        web_app.stop_everything()
+    except Exception:
+        pass
+
+
 def _free_port(preferred: int = 8765) -> int:
     for port in (preferred, 0):
         try:
@@ -165,6 +276,7 @@ def _run_webview(url: str) -> bool:
         register_native_picker(picker)
 
         def _on_closed():
+            _cleanup_on_exit()
             try:
                 req = urllib.request.Request(
                     url + "/api/shutdown", method="POST",
@@ -192,12 +304,18 @@ def _run_webview(url: str) -> bool:
 
 
 def main() -> int:
+    import atexit
+
     log_path = setup_logging(filename="desktop.log")
+    if not _takeover_previous_instance():
+        return 2
     port = _free_port(int(os.environ.get("VKS_PORT", "8765")))
     url = f"http://127.0.0.1:{port}"
     log.info("%s v%s starting on %s (log: %s)", APP_NAME, __version__, url, log_path)
 
     _start_server(port)
+    _write_instance_file(port)
+    atexit.register(_cleanup_on_exit)
     if not _wait_for_server(url):
         log.error("Server did not start in time")
         try:

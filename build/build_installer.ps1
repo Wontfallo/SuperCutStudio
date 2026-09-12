@@ -90,6 +90,11 @@ if ($NoFfmpeg) {
 
 # 3. PyInstaller -------------------------------------------------------------
 Write-Host "[3/4] Running PyInstaller..." -ForegroundColor Yellow
+$commit = ""
+try { $commit = (& git rev-parse --short HEAD 2>$null) } catch {}
+$buildInfo = @{ version = $Version; commit = "$commit"; built = (Get-Date).ToString("yyyy-MM-dd HH:mm") } | ConvertTo-Json -Compress
+Set-Content -Path (Join-Path $Root "static\build_info.json") -Value $buildInfo -Encoding UTF8
+Write-Host "      build info: $buildInfo"
 $distExe = (Join-Path $Root "dist\SuperCutStudio\SuperCutStudio.exe")
 $running = Get-Process -Name SuperCutStudio -ErrorAction SilentlyContinue | Where-Object { $_.Path -and ($_.Path -ieq $distExe) }
 if ($running) {
