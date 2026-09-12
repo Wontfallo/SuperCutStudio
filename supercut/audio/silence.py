@@ -61,6 +61,26 @@ def expand_to_sentence_boundaries(
     return new_start, new_end
 
 
+def expand_edges_to_sentences(
+    start: float,
+    end: float,
+    segments: Sequence[Segment],
+) -> Tuple[float, float]:
+    """Push an already-padded window outward to the sentence boundaries its edges fall in.
+
+    If an edge lands inside a sentence, it moves to that sentence's start (for the
+    left edge) or end (for the right edge). An edge that lands in the silence
+    between sentences stays where it is.
+    """
+    new_start, new_end = start, end
+    for seg in segments:
+        if seg.start <= start <= seg.end:
+            new_start = min(new_start, seg.start)
+        if seg.start <= end <= seg.end:
+            new_end = max(new_end, seg.end)
+    return new_start, new_end
+
+
 def optimize_clip_boundaries(
     hits: Sequence[HitSpan],
     words: Sequence[Word],
@@ -92,10 +112,10 @@ def optimize_clip_boundaries(
             c_end = min(total_duration, c_end)
 
         if sentence_mode and segments:
-            # Grow to the enclosing sentence first, then still apply the user's padding around it.
-            sent_start, sent_end = expand_to_sentence_boundaries(hit.start, hit.end, segments)
-            c_start = max(0.0, sent_start - pre_pad)
-            c_end = sent_end + post_pad
+            # Order of authority: padding first, then sentence expansion.
+            # The padded edges are pushed OUTWARD to the boundaries of whichever
+            # sentence they land in:  [sentence start] <- pre-pad <- hit -> post-pad -> [sentence end]
+            c_start, c_end = expand_edges_to_sentences(c_start, c_end, segments)
             if total_duration > 0:
                 c_end = min(total_duration, c_end)
             if snap_to_silence and words:

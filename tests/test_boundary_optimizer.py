@@ -52,3 +52,35 @@ class TestBoundaryOptimizer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_sentence_mode_pads_first_then_expands_outward():
+    """pad -> then push edges out to the sentence boundaries they land in."""
+    from supercut.models import HitSpan, Segment, Word
+    from supercut.audio.silence import expand_edges_to_sentences, optimize_clip_boundaries
+
+    segments = [
+        Segment(start=0.0, end=4.0, text="Sentence one."),
+        Segment(start=4.5, end=9.0, text="Sentence two with the keyword."),
+        Segment(start=9.5, end=14.0, text="Sentence three."),
+        Segment(start=15.0, end=20.0, text="Sentence four."),
+    ]
+    hit = HitSpan(matched_text="keyword", keyword="keyword", start=7.0, end=7.5)
+
+    # 2s pads: left edge 5.0 lands in sentence two -> 4.5 ; right edge 9.5 lands in sentence three -> 14.0
+    clips = optimize_clip_boundaries([hit], [], segments, pre_pad=2.0, post_pad=2.0,
+                                     snap_to_silence=False, sentence_mode=True, total_duration=30.0)
+    assert (clips[0].start, clips[0].end) == (4.5, 14.0)
+
+    # 5s pads: left edge 2.0 lands in sentence one -> 0.0 ; right edge 12.5 in sentence three -> 14.0
+    clips = optimize_clip_boundaries([hit], [], segments, pre_pad=5.0, post_pad=5.0,
+                                     snap_to_silence=False, sentence_mode=True, total_duration=30.0)
+    assert (clips[0].start, clips[0].end) == (0.0, 14.0)
+
+    # An edge that lands in the silence between sentences stays put (14.2 is between three and four)
+    assert expand_edges_to_sentences(4.6, 14.2, segments) == (4.5, 14.2)
+
+    # Without sentence mode padding alone applies
+    clips = optimize_clip_boundaries([hit], [], segments, pre_pad=2.0, post_pad=2.0,
+                                     snap_to_silence=False, sentence_mode=False, total_duration=30.0)
+    assert (clips[0].start, clips[0].end) == (5.0, 9.5)

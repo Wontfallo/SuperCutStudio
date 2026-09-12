@@ -120,7 +120,7 @@
             </div>
           </div>
           <div class="shaping-row">
-            <label class="check" title="Grow each hit to the whole sentence it was spoken in, then add the padding above."><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence</span></label>
+            <label class="check" title="Padding is applied first. Then each padded edge is pushed outward to the start / end of whichever sentence it lands in, so a clip never opens or closes mid-sentence."><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence</span></label>
             <label class="check" title="Instead of cutting exactly at the padded time, each cut slides to the nearest pause between words (within about 0.8 s) so clips never start or end mid-word."><input type="checkbox" id="setting-snap-silence" checked><span>Snap cuts to silence</span></label>
             <label class="check" title="Besides keyword hits, also detect stretches where the speaker talks unusually fast (about 3.5+ words per second) and add them as clips tagged high-energy."><input type="checkbox" id="setting-high-energy"><span>Also cut fast, excited speech</span></label>
             <span class="dim tiny">hover for details</span>
