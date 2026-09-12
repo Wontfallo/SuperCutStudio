@@ -17,6 +17,7 @@ param(
   [switch]$SkipTests,
   [switch]$NoFfmpeg,
   [switch]$NoInstaller,
+  [switch]$CloseRunning,
   [string]$FfmpegDir = ""
 )
 
@@ -89,6 +90,17 @@ if ($NoFfmpeg) {
 
 # 3. PyInstaller -------------------------------------------------------------
 Write-Host "[3/4] Running PyInstaller..." -ForegroundColor Yellow
+$distExe = (Join-Path $Root "dist\SuperCutStudio\SuperCutStudio.exe")
+$running = Get-Process -Name SuperCutStudio -ErrorAction SilentlyContinue | Where-Object { $_.Path -and ($_.Path -ieq $distExe) }
+if ($running) {
+  if ($CloseRunning) {
+    Write-Host "      closing running dist\SuperCutStudio.exe (pid $($running.Id -join ', '))" -ForegroundColor Yellow
+    $running | Stop-Process -Force
+    Start-Sleep -Seconds 2
+  } else {
+    throw "dist\SuperCutStudio\SuperCutStudio.exe is running (pid $($running.Id -join ', ')). Close the app, or re-run with -CloseRunning."
+  }
+}
 if (Test-Path "dist\SuperCutStudio") { Remove-Item -Recurse -Force "dist\SuperCutStudio" }
 & $Python -m PyInstaller "build\SuperCutStudio.spec" --noconfirm --clean --distpath dist --workpath build\pyi-work
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
