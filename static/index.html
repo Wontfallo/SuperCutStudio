@@ -31,6 +31,11 @@
     </nav>
 
     <div class="topbar-actions">
+      <div class="scale-ctl" title="UI size (Ctrl+= / Ctrl+- / Ctrl+0 to reset)">
+        <button class="btn btn-icon" onclick="changeUiScale(-0.1)" aria-label="Smaller UI">A−</button>
+        <span id="ui-scale-label" class="mono">100%</span>
+        <button class="btn btn-icon" onclick="changeUiScale(0.1)" aria-label="Larger UI">A+</button>
+      </div>
       <button id="btn-cancel" class="btn btn-danger hidden" onclick="cancelJob()" title="Stop the running job (Esc)">■ Stop</button>
       <button id="btn-quick-analyze" class="btn btn-primary" onclick="triggerAnalyze()" title="Transcribe & detect clips, then review before rendering">Analyze Media</button>
       <button class="btn btn-icon" onclick="openSystemModal()" title="System & diagnostics">
@@ -551,6 +556,7 @@
       <div><kbd>I</kbd> / <kbd>O</kbd> Set IN / OUT at playhead</div><div><kbd>[</kbd> / <kbd>]</kbd> Nudge IN earlier / OUT later</div>
       <div><kbd>Shift+[</kbd> / <kbd>Shift+]</kbd> Nudge IN later / OUT earlier</div><div><kbd>Home</kbd> / <kbd>End</kbd> Jump to IN / OUT</div>
       <div><kbd>Delete</kbd> Remove active clip</div><div><kbd>1</kbd>–<kbd>4</kbd> Switch tabs</div>
+      <div><kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>Ctrl</kbd>+<kbd>−</kbd> UI bigger / smaller</div><div><kbd>Ctrl</kbd>+<kbd>0</kbd> Reset UI size</div>
       <div><kbd>Esc</kbd> Stop job / close dialogs</div><div><kbd>?</kbd> This help</div>
     </div>
   </div>

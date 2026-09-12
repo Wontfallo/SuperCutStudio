@@ -126,6 +126,37 @@ window.showToast = showToast;
 window.alert = (msg) => { showToast(String(msg), 'warning'); };
 
 // ---------------------------------------------------------------------------
+// UI scale (high-DPI / 4K comfort)
+// ---------------------------------------------------------------------------
+const UI_SCALE_MIN = 0.8, UI_SCALE_MAX = 2.0;
+let uiScale = 1.0;
+
+function loadUiScale() {
+  let saved = null;
+  try { saved = parseFloat(localStorage.getItem('supercut.uiScale')); } catch (_) {}
+  if (saved && saved >= UI_SCALE_MIN && saved <= UI_SCALE_MAX) uiScale = saved;
+  else if (window.innerWidth >= 2200 || (window.devicePixelRatio || 1) >= 1.75) uiScale = 1.25;
+  applyUiScale();
+}
+
+function applyUiScale() {
+  uiScale = Math.round(Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, uiScale)) * 100) / 100;
+  document.documentElement.style.zoom = String(uiScale);
+  const label = $('ui-scale-label');
+  if (label) label.textContent = `${Math.round(uiScale * 100)}%`;
+  try { localStorage.setItem('supercut.uiScale', String(uiScale)); } catch (_) {}
+  if (typeof drawWaveform === 'function') requestAnimationFrame(drawWaveform);
+}
+
+function changeUiScale(delta) {
+  uiScale = delta === 0 ? 1.0 : uiScale + delta;
+  applyUiScale();
+  showToast(`UI size ${Math.round(uiScale * 100)}%`, 'info', 900);
+}
+window.changeUiScale = changeUiScale;
+window.applyUiScale = applyUiScale;
+
+// ---------------------------------------------------------------------------
 // Tabs & modals
 // ---------------------------------------------------------------------------
 function switchTab(tabName) {
@@ -1396,7 +1427,13 @@ function initKeyboardShortcuts() {
     const target = e.target;
     const tag = (target && target.tagName ? target.tagName.toLowerCase() : '');
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || (target && target.isContentEditable)) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); changeUiScale(0.1); return; }
+      if (e.key === '-' || e.key === '_') { e.preventDefault(); changeUiScale(-0.1); return; }
+      if (e.key === '0') { e.preventDefault(); changeUiScale(0); return; }
+      return;
+    }
+    if (e.altKey) return;
 
     const key = e.key;
     if (key === 'Escape') {
@@ -1684,6 +1721,7 @@ window.loadJobHistory = loadJobHistory;
 // Bootstrap
 // ---------------------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
+  try { loadUiScale(); } catch (err) { console.error('UI scale init error:', err); }
   try { initWaveformAndScrubber(); } catch (err) { console.error('Scrubber init error:', err); }
   try { initKeyboardShortcuts(); } catch (err) { console.error('Keyboard init error:', err); }
   try { initDropZone(); } catch (err) { console.error('Dropzone init error:', err); }
