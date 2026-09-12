@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+crisper-venv/
+.pytest_cache/
+*.egg-info/
+
+# Node (JSDOM test harness)
+node_modules/
+package-lock.json
+
+# Build outputs
+build/pyi-work/
+build/ffmpeg/
+dist/
+*.spec.bak
+
+# Per-user runtime data
+.supercut_data/
+uploads/
+output/
+test_output/
+*.log
+
+# Media & scratch
+*.mp4
+*.mkv
+*.mov
+*.webm
+*.avi
+*.wav
+confusing.png
+
+# Agent scaffolding from earlier sessions
+.agents/
+.claude/launch.json
+
+# Local settings
+settings.json

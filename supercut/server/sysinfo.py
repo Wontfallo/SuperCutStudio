@@ -1,0 +1,77 @@
+"""System capability report for the studio (FFmpeg, GPU, ASR backends, caches)."""
+
+from __future__ import annotations
+
+import os
+import platform
+import subprocess
+import sys
+from typing import Any, Dict, Optional
+
+from .. import __version__
+from ..asr import TranscriptCache, crisper_available, cuda_available, describe_models, find_crisper_python
+from ..paths import (
+    APP_NAME,
+    data_dir,
+    default_output_dir,
+    ffmpeg_available,
+    ffmpeg_path,
+    ffmpeg_version,
+    ffprobe_path,
+    is_frozen,
+    logs_dir,
+)
+from ..video import probe_available_encoders
+
+
+def gpu_name() -> Optional[str]:
+    try:
+        res = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=6,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip().splitlines()[0].strip()
+    except Exception:
+        pass
+    return None
+
+
+def system_report(probe_encoders: bool = True) -> Dict[str, Any]:
+    encoders = probe_available_encoders() if (probe_encoders and ffmpeg_available()) else {}
+    crisper_py = find_crisper_python()
+    cache = TranscriptCache()
+    return {
+        "app": {
+            "name": APP_NAME,
+            "version": __version__,
+            "frozen": is_frozen(),
+            "python": platform.python_version(),
+            "platform": f"{platform.system()} {platform.release()}",
+            "data_dir": str(data_dir()),
+            "logs_dir": str(logs_dir()),
+            "default_output_dir": str(default_output_dir()),
+        },
+        "ffmpeg": {
+            "available": ffmpeg_available(),
+            "path": ffmpeg_path(),
+            "ffprobe_path": ffprobe_path(),
+            "version": ffmpeg_version(),
+        },
+        "encoders": encoders,
+        "nvenc": bool(encoders.get("h264_nvenc") or encoders.get("hevc_nvenc")),
+        "cuda": cuda_available(),
+        "gpu": gpu_name(),
+        "asr": {
+            "crisper_available": crisper_available(),
+            "crisper_python": str(crisper_py) if crisper_py else None,
+            "models": describe_models(),
+        },
+        "transcript_cache": cache.stats(),
+    }
+
+
+__all__ = ["gpu_name", "system_report"]

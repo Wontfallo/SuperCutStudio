@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>SuperCut Studio</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- ================= HEADER ================= -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">SuperCut Studio <span class="brand-badge">v<!--APP_VERSION--></span></div>
+        <div class="brand-sub"><span id="sse-indicator" class="dot dot-amber pulse"></span><span id="sse-status">Connecting to studio core...</span></div>
+      </div>
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button id="tab-btn-setup" class="tab-btn active" role="tab" onclick="switchTab('setup')"><span class="tab-num">1</span> Setup</button>
+      <button id="tab-btn-reviewer" class="tab-btn" role="tab" onclick="switchTab('reviewer')"><span class="tab-num">2</span> Reviewer <span id="badge-clip-count" class="tab-badge">0</span></button>
+      <button id="tab-btn-transcript" class="tab-btn" role="tab" onclick="switchTab('transcript')"><span class="tab-num">3</span> Transcript</button>
+      <button id="tab-btn-export" class="tab-btn" role="tab" onclick="switchTab('export')"><span class="tab-num">4</span> Deliver <span id="badge-result" class="tab-badge hidden">●</span></button>
+    </nav>
+
+    <div class="topbar-actions">
+      <button id="btn-cancel" class="btn btn-danger hidden" onclick="cancelJob()" title="Stop the running job (Esc)">■ Stop</button>
+      <button id="btn-quick-analyze" class="btn btn-primary" onclick="triggerAnalyze()" title="Transcribe & detect clips, then review before rendering">Analyze Media</button>
+      <button class="btn btn-icon" onclick="openSystemModal()" title="System & diagnostics">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <button class="btn btn-icon" onclick="openShortcutsModal()" title="Keyboard shortcuts (?)">?</button>
+    </div>
+  </header>
+
+  <!-- ================= TELEMETRY STRIP ================= -->
+  <div id="telemetry-bar" class="telemetry">
+    <span id="telemetry-stage" class="telemetry-stage">IDLE</span>
+    <div class="progress-track"><div id="telemetry-fill" class="progress-fill" style="width:0%"></div></div>
+    <span id="telemetry-pct" class="mono telemetry-pct">0.0%</span>
+    <span id="telemetry-msg" class="telemetry-msg">Ready to analyze media.</span>
+    <span id="telemetry-time" class="mono telemetry-time"></span>
+  </div>
+
+  <main class="workspace">
+
+    <!-- ================= TAB 1: SETUP ================= -->
+    <section id="tab-setup" class="tab-content">
+      <div class="grid-2">
+
+        <!-- Media source -->
+        <div class="card span-2">
+          <div class="card-head">
+            <div class="card-title-wrap">
+              <div class="card-icon icon-cyan">📁</div>
+              <div>
+                <h2 class="card-title">Media Source</h2>
+                <p class="card-sub">Point at a folder of videos or a single file. Drag &amp; drop also works.</p>
+              </div>
+            </div>
+            <div class="segmented" role="group" aria-label="Input mode">
+              <button id="mode-folder-btn" class="seg-btn active" onclick="setInputMode('Folder')">Folder</button>
+              <button id="mode-file-btn" class="seg-btn" onclick="setInputMode('File')">Single File</button>
+            </div>
+          </div>
+
+          <div class="row gap">
+            <input id="input-path" class="input mono grow" type="text" spellcheck="false"
+                   placeholder="e.g. C:\Videos\Highlights" onkeydown="if(event.key==='Enter'){scanMediaSource();}">
+            <button id="btn-browse" class="btn" onclick="browseInput()" title="Open a native picker">Browse…</button>
+            <button id="btn-scan" class="btn btn-secondary" onclick="scanMediaSource()"><span id="btn-scan-text">Scan</span></button>
+          </div>
+
+          <div id="drop-zone" class="dropzone">
+            <input type="file" id="file-uploader" class="hidden" accept="video/*" onclick="event.stopPropagation()" onchange="handleFileUpload(event)">
+            <div class="dropzone-icon">⤓</div>
+            <div class="dropzone-text">Drop a video here or <span class="link" onclick="event.stopPropagation(); document.getElementById('file-uploader').click();">browse to upload</span></div>
+            <div class="dropzone-hint">MP4 · MKV · MOV · WebM · AVI · TS · M4V · FLV · WMV</div>
+          </div>
+
+          <div id="scanned-assets-container" class="hidden">
+            <div class="row between small muted">
+              <span><strong id="scanned-count" class="text">0</strong> file(s) detected <span id="scanned-info" class="mono"></span></span>
+              <span id="scanned-total" class="mono"></span>
+            </div>
+            <div id="scanned-list" class="file-list"></div>
+          </div>
+        </div>
+
+        <!-- Keywords -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-wrap">
+              <div class="card-icon icon-green">#</div>
+              <div>
+                <h2 class="card-title">Keyword Matrix</h2>
+                <p class="card-sub">Words or phrases to cut around. Plurals match automatically.</p>
+              </div>
+            </div>
+            <button class="btn btn-ghost small" onclick="clearKeywords()">Clear</button>
+          </div>
+
+          <div class="row gap">
+            <input id="keyword-input" class="input grow" type="text" placeholder="Type a keyword, press Enter (comma separates several)"
+                   onkeydown="handleKeywordKeydown(event)">
+            <button class="btn btn-success" onclick="addKeywordFromInput()">Add</button>
+            <button id="btn-discover" class="btn" onclick="triggerDiscover()" title="Transcribe and suggest the strongest keywords">✨ Auto-discover</button>
+          </div>
+          <div id="keyword-chips" class="chips"></div>
+          <div id="discovered-panel" class="hidden">
+            <div class="small muted">Suggested from speech (click to add):</div>
+            <div id="discovered-pills" class="pills"></div>
+          </div>
+
+          <div class="divider"></div>
+          <label class="label-row"><span>Exclude keywords <span class="muted">(skip hits inside these)</span></span></label>
+          <div class="row gap">
+            <input id="exclude-input" class="input grow" type="text" placeholder="e.g. sponsor, intro" onkeydown="handleExcludeKeydown(event)">
+            <button class="btn btn-danger-ghost" onclick="addExcludeFromInput()">Exclude</button>
+          </div>
+          <div id="exclude-chips" class="chips chips-exclude"></div>
+
+          <div class="divider"></div>
+          <div class="options-grid">
+            <label class="check"><input type="checkbox" id="setting-case-sensitive"><span>Case-sensitive</span></label>
+            <label class="check"><input type="checkbox" id="setting-regex"><span>Regex patterns</span></label>
+            <label class="check"><input type="checkbox" id="setting-sentence-mode"><span>Expand to full sentence</span></label>
+            <label class="check"><input type="checkbox" id="setting-snap-silence" checked><span>Snap to silence</span></label>
+            <label class="check"><input type="checkbox" id="setting-high-energy"><span>Also detect high-energy speech</span></label>
+            <label class="check"><input type="checkbox" id="setting-auto-keywords"><span>Auto-add discovered keywords</span></label>
+          </div>
+          <div class="sliders">
+            <div class="slider-row">
+              <label for="setting-fuzzy">Fuzzy match <span id="fuzzy-label" class="mono muted">off</span></label>
+              <input type="range" id="setting-fuzzy" min="0" max="0.95" step="0.05" value="0">
+            </div>
+            <div class="slider-row">
+              <label for="setting-pre-pad">Pre-pad <span id="pre-pad-label" class="mono muted">1.0s</span></label>
+              <input type="range" id="setting-pre-pad" min="0" max="10" step="0.1" value="1">
+            </div>
+            <div class="slider-row">
+              <label for="setting-post-pad">Post-pad <span id="post-pad-label" class="mono muted">1.0s</span></label>
+              <input type="range" id="setting-post-pad" min="0" max="10" step="0.1" value="1">
+            </div>
+            <div class="slider-row">
+              <label for="setting-merge-gap">Merge clips closer than <span id="merge-gap-label" class="mono muted">0.5s</span></label>
+              <input type="range" id="setting-merge-gap" min="0" max="5" step="0.1" value="0.5">
+            </div>
+            <div class="slider-row">
+              <label for="setting-max-clip">Max clip length <span id="max-clip-label" class="mono muted">unlimited</span></label>
+              <input type="range" id="setting-max-clip" min="0" max="120" step="1" value="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Engine, look & output -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-wrap">
+              <div class="card-icon icon-purple">⚙</div>
+              <div>
+                <h2 class="card-title">Engine, Look &amp; Output</h2>
+                <p class="card-sub">Speech model, framing, transitions, captions and what gets saved.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="setting-model">Speech model</label>
+              <select id="setting-model" class="select"></select>
+              <div id="model-hint" class="hint"></div>
+            </div>
+            <div class="field">
+              <label for="setting-language">Language</label>
+              <select id="setting-language" class="select">
+                <option value="auto">Auto-detect</option>
+                <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
+                <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option>
+                <option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option>
+                <option value="hi">Hindi</option><option value="ar">Arabic</option><option value="ru">Russian</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="setting-aspect-ratio">Aspect ratio</label>
+              <select id="setting-aspect-ratio" class="select">
+                <option value="source">Source (keep original)</option>
+                <option value="16:9">16:9 Widescreen 1920×1080</option>
+                <option value="9:16">9:16 Vertical blur canvas (Shorts / Reels)</option>
+                <option value="1:1">1:1 Square 1080×1080</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="setting-transition">Transition</label>
+              <div class="row gap">
+                <select id="setting-transition" class="select grow">
+                  <option value="cut">Hard cut (fastest)</option>
+                  <option value="crossfade">Crossfade dissolve</option>
+                  <option value="fade_black">Dip to black</option>
+                  <option value="swipe_left">Swipe left</option>
+                </select>
+                <input type="number" id="setting-transition-duration" class="input w-70" min="0.1" max="3" step="0.1" value="0.3" title="Transition duration (s)">
+              </div>
+            </div>
+            <div class="field">
+              <label for="setting-encoder">Encoder</label>
+              <select id="setting-encoder" class="select">
+                <option value="auto">Auto (NVENC → CPU fallback)</option>
+                <option value="hevc_nvenc">NVIDIA HEVC (hevc_nvenc)</option>
+                <option value="h264_nvenc">NVIDIA H.264 (h264_nvenc)</option>
+                <option value="av1_nvenc">NVIDIA AV1 (av1_nvenc)</option>
+                <option value="libx264">CPU H.264 (libx264)</option>
+                <option value="libx265">CPU HEVC (libx265)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="setting-quality">Quality</label>
+              <select id="setting-quality" class="select">
+                <option value="draft">Draft (fastest)</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="high">High (slower, larger)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="setting-subtitle-style">Captions</label>
+              <div class="row gap">
+                <select id="setting-subtitle-style" class="select grow">
+                  <option value="karaoke_amber">Karaoke amber glow</option>
+                  <option value="karaoke_cyan">Karaoke cyan glow</option>
+                  <option value="clean_white">Clean white</option>
+                  <option value="bold_yellow">Bold yellow (Impact)</option>
+                  <option value="minimal_caption">Minimal caption</option>
+                </select>
+                <select id="setting-subtitle-mode" class="select w-130" title="Caption content">
+                  <option value="karaoke">Spoken words</option>
+                  <option value="keyword">Keyword badge</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="setting-output-name">Master file name <span class="muted">(optional)</span></label>
+              <input id="setting-output-name" class="input" type="text" placeholder="FINAL_BATCH_SUPERCUT">
+            </div>
+          </div>
+
+          <div class="options-grid top-gap">
+            <label class="check"><input type="checkbox" id="setting-burn-subtitles"><span>Burn captions into video</span></label>
+            <label class="check"><input type="checkbox" id="setting-loudness" checked><span>Normalize loudness (EBU R128)</span></label>
+            <label class="check"><input type="checkbox" id="setting-fast-seek" checked><span>Fast seek rendering</span></label>
+            <label class="check"><input type="checkbox" id="setting-open-folder"><span>Open folder when done</span></label>
+          </div>
+
+          <div class="divider"></div>
+          <div class="label-row"><span>Outputs</span></div>
+          <div class="options-grid">
+            <label class="check"><input type="checkbox" id="setting-batch-stitch" checked><span>Master combined video</span></label>
+            <label class="check"><input type="checkbox" id="setting-per-video-stitch" checked><span>Per-video highlight reels</span></label>
+            <label class="check"><input type="checkbox" id="setting-individual-clips"><span>Individual clip files</span></label>
+            <label class="check"><input type="checkbox" id="setting-thumbnails"><span>Clip thumbnails</span></label>
+            <label class="check"><input type="checkbox" id="setting-contact-sheet"><span>Contact sheet image</span></label>
+          </div>
+          <div class="label-row top-gap"><span>Sidecar files</span></div>
+          <div class="options-grid">
+            <label class="check"><input type="checkbox" id="setting-export-srt" checked><span>Subtitles (.srt)</span></label>
+            <label class="check"><input type="checkbox" id="setting-export-vtt"><span>WebVTT (.vtt)</span></label>
+            <label class="check"><input type="checkbox" id="setting-export-ass"><span>Karaoke (.ass)</span></label>
+            <label class="check"><input type="checkbox" id="setting-export-transcript"><span>Full transcript (.txt/.srt)</span></label>
+            <label class="check"><input type="checkbox" id="setting-export-fcpxml"><span>Premiere / FCP XML</span></label>
+            <label class="check"><input type="checkbox" id="setting-export-edl"><span>DaVinci EDL</span></label>
+          </div>
+
+          <div class="divider"></div>
+          <label for="output-dir" class="label-row"><span>Output folder</span></label>
+          <div class="row gap">
+            <input id="output-dir" class="input mono grow" type="text" spellcheck="false" placeholder="Where renders are saved">
+            <button class="btn" onclick="browseOutput()">Browse…</button>
+            <button class="btn btn-ghost" onclick="openOutputFolder()" title="Open in Explorer">Open</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action station -->
+      <div class="card action-station">
+        <div class="action-buttons">
+          <button id="btn-start-stitching" class="btn btn-hero" onclick="trigger1ClickSuperCut()">
+            <span class="hero-icon">▶</span><span id="btn-start-text">Start SuperCut</span>
+            <span class="hero-sub">transcribe → find → render</span>
+          </button>
+          <button id="btn-run-analysis" class="btn btn-secondary tall" onclick="triggerAnalyze()" title="Transcribe and inspect each clip before rendering">
+            🔍 <span id="btn-run-text">Analyze &amp; Review First</span>
+          </button>
+          <button id="btn-stitch-folder" class="btn btn-secondary tall" onclick="triggerStitchFolderOnly()" title="Join every video in the folder, no transcription">
+            🎬 <span id="btn-folder-text">Stitch Folder Only</span>
+          </button>
+          <button id="btn-cancel-pipeline" class="btn btn-danger tall hidden" onclick="cancelJob()">■ Stop</button>
+        </div>
+        <div class="row between small">
+          <div class="row gap-s"><span id="setup-status-indicator" class="dot dot-green"></span><span id="setup-status-text">Ready</span></div>
+          <div class="row gap mono small muted">
+            <span>Elapsed <b id="setup-elapsed-timer" class="text-cyan">00:00</b></span>
+            <span id="setup-eta"></span>
+            <button class="btn btn-ghost small" onclick="saveCurrentConfig(true)">Save settings</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Completion card (1-click) -->
+      <div id="setup-completion-card" class="card result-card hidden">
+        <div class="card-head">
+          <div class="card-title-wrap">
+            <span class="dot dot-green pulse"></span>
+            <div>
+              <h3 class="card-title">SuperCut complete</h3>
+              <p id="setup-completion-stat" class="card-sub mono"></p>
+            </div>
+          </div>
+          <div class="row gap-s">
+            <button class="btn btn-ghost small" onclick="switchTab('export')">Open Deliver tab →</button>
+            <button class="btn btn-ghost small" onclick="document.getElementById('setup-completion-card').classList.add('hidden')">✕</button>
+          </div>
+        </div>
+        <div class="player-frame"><video id="setup-final-player" controls preload="metadata"></video></div>
+        <div class="row gap wrap">
+          <a id="btn-setup-download-master" class="btn btn-primary" href="#" download>Download master video</a>
+          <button id="btn-setup-open-folder" class="btn" onclick="openResultFolder()">Open output folder</button>
+        </div>
+      </div>
+
+      <!-- Live log -->
+      <div class="card log-card">
+        <div class="card-head compact">
+          <h3 class="card-title small-title">Live log</h3>
+          <div class="row gap-s">
+            <label class="check small"><input type="checkbox" id="log-autoscroll" checked><span>Auto-scroll</span></label>
+            <button class="btn btn-ghost small" onclick="clearLog()">Clear</button>
+          </div>
+        </div>
+        <div id="log-console" class="log-console mono"></div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: REVIEWER ================= -->
+    <section id="tab-reviewer" class="tab-content hidden">
+      <div class="reviewer-grid">
+        <!-- Player column -->
+        <div class="card player-card">
+          <div class="row between small">
+            <span class="row gap-s"><span class="dot dot-green"></span><span id="player-media-title" class="ellipsis">No media loaded</span></span>
+            <span id="player-time-badge" class="mono text-cyan">00:00.000</span>
+          </div>
+          <div class="player-frame"><video id="studio-video-player" controls preload="metadata"></video></div>
+
+          <div id="scrubber-container" class="scrubber">
+            <div id="waveform-track" class="waveform-track" title="Click or drag to scrub">
+              <canvas id="player-waveform-canvas"></canvas>
+              <div id="waveform-clip-region" class="clip-region hidden"><span class="tag-in">IN</span><span class="tag-out">OUT</span></div>
+              <div id="scrubber-hover-line" class="hover-line hidden"></div>
+              <div id="scrubber-hover-tooltip" class="hover-tip hidden">00:00.0</div>
+              <div id="waveform-playhead" class="playhead" style="left:0%"><div class="playhead-knob"></div></div>
+            </div>
+            <input type="range" id="player-scrubber" class="range-scrub" min="0" max="100" value="0" step="0.001" title="Timeline scrubber">
+            <div class="row between mono tiny muted">
+              <span id="scrubber-current-time" class="text-cyan">00:00.000</span>
+              <span id="scrubber-clip-range">No active clip</span>
+              <span id="scrubber-total-duration">00:00.000</span>
+            </div>
+          </div>
+
+          <div class="clip-controls">
+            <button class="btn small" onclick="prevClip()" title="Previous clip (P / ↑)">⏮ Prev</button>
+            <button class="btn small" onclick="seekToActiveClipStart()" title="Jump to IN (Home)">⇤ IN</button>
+            <button class="btn btn-primary small" onclick="playClipSegment()" title="Play clip range (Enter)">▶ Play clip</button>
+            <button class="btn small" onclick="seekToActiveClipEnd()" title="Jump to OUT (End)">OUT ⇥</button>
+            <button class="btn small" onclick="nextClip()" title="Next clip (N / ↓)">Next ⏭</button>
+          </div>
+          <div class="clip-controls">
+            <button class="btn small" onclick="nudgeClip('start', -0.5)" title="IN earlier ( [ )">IN −0.5</button>
+            <button class="btn small" onclick="nudgeClip('start', 0.5)" title="IN later (Shift+[ )">IN +0.5</button>
+            <button class="btn small" onclick="setClipBoundFromPlayhead('start')" title="Set IN at playhead (I)">Set IN ◂</button>
+            <button class="btn small" onclick="setClipBoundFromPlayhead('end')" title="Set OUT at playhead (O)">▸ Set OUT</button>
+            <button class="btn small" onclick="nudgeClip('end', -0.5)" title="OUT earlier (Shift+])">OUT −0.5</button>
+            <button class="btn small" onclick="nudgeClip('end', 0.5)" title="OUT later ( ] )">OUT +0.5</button>
+          </div>
+
+          <div class="kbd-hint">
+            <span><kbd>Space</kbd> play/pause</span><span><kbd>J</kbd>/<kbd>L</kbd> ±2s</span><span><kbd>S</kbd> toggle clip</span>
+            <span><kbd>N</kbd>/<kbd>P</kbd> next/prev</span><span><kbd>I</kbd>/<kbd>O</kbd> set in/out</span><span><kbd>?</kbd> all shortcuts</span>
+          </div>
+
+          <div id="active-clip-details" class="clip-details">
+            <div class="row between">
+              <span id="clip-detail-keyword" class="text-cyan bold">No clip selected</span>
+              <span id="clip-detail-duration" class="mono muted">-</span>
+            </div>
+            <div id="clip-detail-text" class="small muted italic">Audition a clip from the list to load it here.</div>
+            <div class="row gap top-gap-s">
+              <input id="clip-title-input" class="input small grow" type="text" placeholder="Custom caption / title for this clip" onkeydown="if(event.key==='Enter'){saveClipTitle();}">
+              <button class="btn small" onclick="saveClipTitle()">Save title</button>
+              <button class="btn btn-danger-ghost small" onclick="deleteActiveClip()" title="Remove clip (Delete)">Delete</button>
+            </div>
+            <div class="row gap top-gap-s">
+              <button class="btn btn-success small" onclick="addManualClipFromPlayer()" title="Create a clip from the current IN/OUT markers">+ Add clip from markers</button>
+              <span class="small muted">Markers: <span id="marker-in" class="mono">—</span> → <span id="marker-out" class="mono">—</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Clip list column -->
+        <div class="card clips-card">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Detected Clips</h2>
+              <p class="card-sub">Review, audition and curate what gets stitched.</p>
+            </div>
+            <div class="row gap-s">
+              <button class="btn small" onclick="batchToggleClips(true)">All</button>
+              <button class="btn small" onclick="batchToggleClips(false)">None</button>
+              <button class="btn small" onclick="batchToggleClips(null, true)">Invert</button>
+            </div>
+          </div>
+
+          <div class="row gap wrap filter-row">
+            <input id="clip-search" class="input small grow" type="text" placeholder="Search matched text…" oninput="renderClipsTable()">
+            <select id="clip-filter-keyword" class="select small" onchange="renderClipsTable()"><option value="">All keywords</option></select>
+            <select id="clip-filter-video" class="select small" onchange="renderClipsTable()"><option value="">All videos</option></select>
+            <select id="clip-sort" class="select small" onchange="renderClipsTable()">
+              <option value="time">Sort: time</option>
+              <option value="keyword">Sort: keyword</option>
+              <option value="duration">Sort: duration</option>
+              <option value="confidence">Sort: confidence</option>
+            </select>
+            <label class="check small"><input type="checkbox" id="clip-filter-selected" onchange="renderClipsTable()"><span>Selected only</span></label>
+          </div>
+
+          <div class="table-wrap">
+            <table class="clips-table">
+              <thead><tr><th class="w-40">Use</th><th class="w-40">#</th><th>Keyword</th><th>Window</th><th>Length</th><th>Matched</th><th class="right">Actions</th></tr></thead>
+              <tbody id="clips-tbody"><tr><td colspan="7" class="empty">No clips detected yet. Run analysis in Setup to populate this cockpit.</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="row between top-gap">
+            <div class="small muted">Curated: <b id="curated-count" class="text-cyan">0</b> clip(s) · <span id="curated-footage" class="mono">0.0s</span> of footage</div>
+            <div class="row gap-s">
+              <button class="btn" onclick="switchTab('transcript')">Transcript →</button>
+              <button class="btn btn-primary" onclick="triggerRender()">Render Curated SuperCut</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: TRANSCRIPT ================= -->
+    <section id="tab-transcript" class="tab-content hidden">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title">Transcript Inspector</h2>
+            <p class="card-sub">Verbatim speech with word timings. Click a line to seek the reviewer; use “+ clip” to cut a segment.</p>
+          </div>
+          <div class="row gap-s wrap">
+            <select id="transcript-video-select" class="select small" onchange="renderTranscriptForSelectedVideo()"><option value="">No video loaded</option></select>
+            <button class="btn small" onclick="exportTranscript('txt')">TXT</button>
+            <button class="btn small" onclick="exportTranscript('srt')">SRT</button>
+            <button class="btn small" onclick="exportTranscript('json')">JSON</button>
+            <button class="btn small" onclick="copyTranscript()">Copy</button>
+          </div>
+        </div>
+        <div class="row gap">
+          <input id="transcript-search-input" class="input grow" type="text" placeholder="Search within transcript…" oninput="filterTranscriptLines()">
+          <span id="transcript-match-count" class="mono small muted">0 matches</span>
+          <span id="transcript-meta" class="mono small muted"></span>
+        </div>
+        <div id="transcript-container" class="transcript">
+          <div class="empty">No transcripts loaded yet. Run analysis to transcribe your media.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 4: DELIVER ================= -->
+    <section id="tab-export" class="tab-content hidden">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-wrap">
+            <div class="card-icon icon-cyan">⤓</div>
+            <div>
+              <h2 class="card-title">Production &amp; Delivery</h2>
+              <p class="card-sub">Hardware-accelerated render of the curated clips, plus every sidecar file.</p>
+            </div>
+          </div>
+          <div class="row gap-s">
+            <button class="btn" onclick="switchTab('reviewer')">← Reviewer</button>
+            <button class="btn btn-primary" onclick="triggerRender()">Start Render</button>
+          </div>
+        </div>
+
+        <div id="render-result-banner" class="hidden">
+          <div class="row between">
+            <span class="row gap-s"><span class="dot dot-green pulse"></span><b>SuperCut ready</b></span>
+            <span id="render-time-stat" class="mono small muted"></span>
+          </div>
+          <div class="player-frame top-gap"><video id="final-video-player" controls preload="metadata"></video></div>
+          <div class="stats-grid" id="result-stats"></div>
+          <div class="row gap wrap top-gap">
+            <a id="btn-download-master" class="btn btn-primary" href="#" download>Download master (.mp4)</a>
+            <a id="btn-download-srt" class="btn" href="#" download>Subtitles (.srt)</a>
+            <a id="btn-download-report" class="btn" href="#" download>Report (.json)</a>
+            <button class="btn btn-ghost" onclick="openResultFolder()">Open output folder</button>
+          </div>
+          <div class="divider"></div>
+          <h4 class="small-title">Artifacts</h4>
+          <div id="artifacts-list" class="artifacts"></div>
+          <div class="divider"></div>
+          <h4 class="small-title">Per-video breakdown</h4>
+          <div class="table-wrap"><table class="clips-table"><thead><tr><th>Video</th><th>Hits</th><th>Clips</th><th>Transcribe</th><th>Encode</th><th>Output</th></tr></thead><tbody id="per-video-tbody"></tbody></table></div>
+        </div>
+        <div id="render-empty" class="empty">Nothing rendered yet. Curate clips in the Reviewer, then start a render.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head compact"><h3 class="card-title small-title">Job history</h3><button class="btn btn-ghost small" onclick="loadJobHistory()">Refresh</button></div>
+        <div id="job-history" class="history"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= MODALS ================= -->
+  <div id="modal-backdrop" class="modal-backdrop hidden" onclick="closeModals()"></div>
+  <div id="system-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3>System &amp; Diagnostics</h3><button class="btn btn-ghost small" onclick="closeModals()">✕</button></div>
+    <div id="system-body" class="modal-body">Loading…</div>
+    <div class="modal-foot row gap-s">
+      <button class="btn small" onclick="loadSystemInfo(true)">Re-probe hardware</button>
+      <button class="btn btn-danger-ghost small" onclick="clearTranscriptCache()">Clear transcript cache</button>
+      <button class="btn small" onclick="openPath(systemInfo && systemInfo.app ? systemInfo.app.logs_dir : '')">Open logs</button>
+    </div>
+  </div>
+  <div id="shortcuts-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3>Keyboard shortcuts</h3><button class="btn btn-ghost small" onclick="closeModals()">✕</button></div>
+    <div class="modal-body shortcuts">
+      <div><kbd>Space</kbd> Play / pause</div><div><kbd>J</kbd> / <kbd>L</kbd> Jump −2s / +2s</div>
+      <div><kbd>←</kbd> / <kbd>→</kbd> Step −0.1s / +0.1s</div><div><kbd>S</kbd> Toggle clip selection</div>
+      <div><kbd>N</kbd> / <kbd>P</kbd> Next / previous clip</div><div><kbd>Enter</kbd> Play active clip range</div>
+      <div><kbd>I</kbd> / <kbd>O</kbd> Set IN / OUT at playhead</div><div><kbd>[</kbd> / <kbd>]</kbd> Nudge IN earlier / OUT later</div>
+      <div><kbd>Shift+[</kbd> / <kbd>Shift+]</kbd> Nudge IN later / OUT earlier</div><div><kbd>Home</kbd> / <kbd>End</kbd> Jump to IN / OUT</div>
+      <div><kbd>Delete</kbd> Remove active clip</div><div><kbd>1</kbd>–<kbd>4</kbd> Switch tabs</div>
+      <div><kbd>Esc</kbd> Stop job / close dialogs</div><div><kbd>?</kbd> This help</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

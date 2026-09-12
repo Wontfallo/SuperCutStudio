@@ -1,0 +1,13 @@
+# SuperCut Studio runtime dependencies (Python 3.10+)
+faster-whisper>=1.1.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pydantic>=2.6
+pillow>=10.0
+numpy>=1.26
+pywebview>=5.0
+# Desktop (CustomTkinter) studio - optional legacy UI
+customtkinter>=5.2
+# Packaging
+pyinstaller>=6.10
