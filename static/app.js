@@ -132,10 +132,8 @@ const UI_SCALE_MIN = 0.8, UI_SCALE_MAX = 2.0;
 let uiScale = 1.0;
 
 function loadUiScale() {
-  let saved = null;
-  try { saved = parseFloat(localStorage.getItem('supercut.uiScale')); } catch (_) {}
-  if (saved && saved >= UI_SCALE_MIN && saved <= UI_SCALE_MAX) uiScale = saved;
-  else if (window.innerWidth >= 2200 || (window.devicePixelRatio || 1) >= 1.75) uiScale = 1.25;
+  uiScale = 1.0;
+  try { localStorage.removeItem('supercut.uiScale'); } catch (_) {}
   const range = $('ui-scale-range');
   if (range) {
     range.addEventListener('input', () => { uiScale = parseInt(range.value, 10) / 100; applyUiScale(false); });
@@ -158,7 +156,6 @@ function applyUiScale(persist = true) {
   if (label) label.textContent = `${Math.round(uiScale * 100)}%`;
   const range = $('ui-scale-range');
   if (range && parseInt(range.value, 10) !== Math.round(uiScale * 100)) range.value = String(Math.round(uiScale * 100));
-  if (persist) { try { localStorage.setItem('supercut.uiScale', String(uiScale)); } catch (_) {} }
   if (typeof drawWaveform === 'function') requestAnimationFrame(drawWaveform);
 }
 
