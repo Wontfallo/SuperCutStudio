@@ -75,8 +75,7 @@
         </div>
         <div id="drop-zone" class="dropstrip">
           <input type="file" id="file-uploader" class="hidden" accept="video/*" onclick="event.stopPropagation()" onchange="handleFileUpload(event)">
-          <span>⤓ Drop a video anywhere on this card to upload it, or <span class="link" onclick="event.stopPropagation(); document.getElementById('file-uploader').click();">browse to upload</span></span>
-          <span class="dim">MP4 · MKV · MOV · WebM · AVI · TS · M4V · FLV · WMV</span>
+          <span title="MP4, MKV, MOV, WebM, AVI, TS, M4V, FLV, WMV">⤓ Drop a video on this card, or <span class="link" onclick="event.stopPropagation(); document.getElementById('file-uploader').click();">browse to upload</span></span>
         </div>
         <div id="scanned-assets-container" class="hidden">
           <div class="row between small muted">
@@ -99,21 +98,20 @@
             <div class="card-title-wrap">
               <div class="card-icon icon-green">#</div>
               <div>
-                <h2 class="card-title">Keyword Matrix</h2>
-                <p class="card-sub">Words or phrases to cut around. “sister” also matches sisters, sister's, Sister?</p>
+                <h2 class="card-title" title="Words or phrases to cut around. Plurals and possessives match automatically (sister = sisters, sister's). Case and punctuation are ignored.">Keyword Matrix</h2>
               </div>
             </div>
             <button class="btn btn-ghost small" onclick="clearKeywords()">Clear</button>
           </div>
 
           <div class="row gap">
-            <input id="keyword-input" class="input grow" type="text" placeholder="Type a keyword, press Enter (comma separates several)"
+            <input id="keyword-input" class="input grow" type="text" placeholder="Keyword or phrase, press Enter" title="Comma separates several keywords. Plurals and possessives match automatically."
                    onkeydown="handleKeywordKeydown(event)">
             <button class="btn btn-success" onclick="addKeywordFromInput()">Add</button>
           </div>
           <div id="keyword-chips" class="chips"></div>
 
-          <div class="label-row top-gap-s"><span>Clip padding</span><span class="muted">seconds kept before / after each hit</span></div>
+          <div class="label-row top-gap-s" title="Seconds of video kept before and after each keyword hit."><span>Clip padding</span></div>
           <div class="sliders">
             <div class="slider-row">
               <label for="setting-pre-pad">Pre-pad <span id="pre-pad-label" class="mono muted">1.0s</span></label>
@@ -129,13 +127,12 @@
             <label class="check" title="Instead of cutting exactly at the padded time, each cut slides to the nearest pause between words (within about 0.8 s) so clips never start or end mid-word."><input type="checkbox" id="setting-snap-silence" checked><span>Snap cuts to silence</span></label>
             <label class="check" title="Besides keyword hits, also detect stretches where the speaker talks unusually fast (about 3.5+ words per second) and add them as clips tagged high-energy."><input type="checkbox" id="setting-high-energy"><span>Also cut fast, excited speech</span></label>
             <label class="check" title="Normally hits whose padded windows touch are merged into one longer clip. Tick this to keep one clip per hit even if they overlap, so every row in the reviewer is a single keyword."><input type="checkbox" id="setting-one-per-hit"><span>One clip per hit (never merge)</span></label>
-            <span class="dim tiny">hover for details</span>
           </div>
 
           <details class="drawer" id="drawer-matching">
             <summary>Matching options <span class="muted">exclusions, fuzzy matching, merging, max length</span></summary>
             <div class="drawer-body">
-              <label class="label-row"><span>Exclude keywords <span class="muted">(ignore hits inside these)</span></span></label>
+              <label class="label-row" title="A keyword hit that sits inside one of these phrases is ignored."><span>Exclude keywords</span></label>
               <div class="row gap">
                 <input id="exclude-input" class="input small grow" type="text" placeholder="e.g. sponsor, intro" onkeydown="handleExcludeKeydown(event)">
                 <button class="btn btn-danger-ghost small" onclick="addExcludeFromInput()">Exclude</button>
@@ -165,8 +162,7 @@
             <div class="card-title-wrap">
               <div class="card-icon icon-purple">⚙</div>
               <div>
-                <h2 class="card-title">Engine, Look &amp; Output</h2>
-                <p class="card-sub">Speech model, framing, captions and where renders go.</p>
+                <h2 class="card-title" title="Speech model, framing, captions and where renders go.">Engine, Look &amp; Output</h2>
               </div>
             </div>
           </div>
@@ -422,8 +418,8 @@
         <div class="card clips-card">
           <div class="card-head">
             <div>
-              <h2 class="card-title">Detected Clips</h2>
-              <p class="card-sub" id="clips-summary">Review, audition and curate what gets stitched.</p>
+              <h2 class="card-title" title="Tick the clips to keep, audition them in the player, trim with the IN/OUT controls, then render.">Detected Clips</h2>
+              <p class="card-sub" id="clips-summary"></p>
             </div>
             <div class="row gap-s">
               <button class="btn small" onclick="batchToggleClips(true)">All</button>
@@ -468,8 +464,7 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h2 class="card-title">Transcript Inspector</h2>
-            <p class="card-sub">Verbatim speech with word timings. Highlighted words are the engine's keyword hits. Click a line to seek; “+ clip” cuts a segment.</p>
+            <h2 class="card-title" title="Verbatim transcript with word timings. Highlighted words are keyword hits. Click a line to seek the player; '+ clip' cuts that line as a clip.">Transcript Inspector</h2>
           </div>
           <div class="row gap-s wrap">
             <select id="transcript-video-select" class="select small" onchange="renderTranscriptForSelectedVideo()"><option value="">No video loaded</option></select>
@@ -497,8 +492,7 @@
           <div class="card-title-wrap">
             <div class="card-icon icon-cyan">⤓</div>
             <div>
-              <h2 class="card-title">Production &amp; Delivery</h2>
-              <p class="card-sub">Hardware-accelerated render of the curated clips, plus every sidecar file.</p>
+              <h2 class="card-title" title="Renders the ticked clips with the GPU encoder and writes the master video plus every sidecar file into a job folder.">Production &amp; Delivery</h2>
             </div>
           </div>
           <div class="row gap-s">
@@ -545,8 +539,7 @@
             <div class="card-title-wrap">
               <div class="card-icon icon-green">🎬</div>
               <div>
-                <h2 class="card-title">Stitch Folder Only</h2>
-                <p class="card-sub">Join every video in a folder into one file, in name order. No transcription, no keywords. Uses the aspect ratio, encoder and output folder from Setup.</p>
+                <h2 class="card-title" title="Joins every video in a folder into one file in name order. No transcription or keywords. Uses the aspect ratio, encoder and output folder from Setup.">Stitch Folder Only</h2>
               </div>
             </div>
           </div>
@@ -564,8 +557,7 @@
             <div class="card-title-wrap">
               <div class="card-icon icon-purple">🧹</div>
               <div>
-                <h2 class="card-title">Maintenance</h2>
-                <p class="card-sub">Caches, logs and diagnostics.</p>
+                <h2 class="card-title" title="Caches, logs and diagnostics.">Maintenance</h2>
               </div>
             </div>
           </div>

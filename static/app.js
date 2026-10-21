@@ -260,6 +260,7 @@ function populateModelSelect() {
     opt.textContent = `${m.label}${m.recommended ? ' ★' : ''}${m.available ? '' : ' (not installed)'}`;
     opt.dataset.detail = m.detail || '';
     opt.dataset.available = m.available ? '1' : '0';
+    opt.title = m.detail || '';
     sel.appendChild(opt);
   }
   sel.value = current;
@@ -274,7 +275,8 @@ function updateModelHint() {
   const opt = sel.selectedOptions[0];
   if (!opt) { hint.textContent = ''; return; }
   const avail = opt.dataset.available !== '0';
-  hint.innerHTML = `${escapeHtml(opt.dataset.detail || '')}${avail ? '' : ' <span class="bad">Not installed - a Whisper model will be used instead.</span>'}`;
+  sel.title = opt.dataset.detail || '';
+  hint.innerHTML = avail ? '' : '<span class="bad">Not installed - a Whisper model will be used instead.</span>';
 }
 
 async function clearTranscriptCache() {
@@ -917,7 +919,7 @@ async function resetSession() {
     $('badge-clip-count').textContent = '0';
     $('curated-count').textContent = '0';
     $('curated-footage').textContent = '0.0s';
-    const summary = $('clips-summary'); if (summary) summary.textContent = 'Review, audition and curate what gets stitched.';
+    const summary = $('clips-summary'); if (summary) summary.textContent = '';
     await loadTranscripts();
     $('render-result-banner').classList.add('hidden'); $('render-empty').classList.remove('hidden'); $('badge-result').classList.add('hidden');
     $('setup-completion-card').classList.add('hidden');
@@ -1060,11 +1062,14 @@ async function loadClips() {
       const hits = data.total_hits || 0;
       const b = data.boundaries || {};
       if (data.count > 0 && hits > data.count && b.merge_hits !== false) {
-        summary.textContent = `${hits} keyword hits merged into ${data.count} clip(s): hits closer together than the padding (${(b.pre_pad ?? 1).toFixed(1)}s before / ${(b.post_pad ?? 1).toFixed(1)}s after) are joined into one clip. Lower the padding in Setup for more, shorter clips.`;
+        summary.textContent = `${hits} hits → ${data.count} clips`;
+        summary.title = `Hits closer together than the padding (${(b.pre_pad ?? 1).toFixed(1)}s before / ${(b.post_pad ?? 1).toFixed(1)}s after) are merged into one clip. Lower the padding or tick "One clip per hit" in Setup for separate clips.`;
       } else if (data.count > 0) {
-        summary.textContent = `${hits} keyword hit(s) → ${data.count} clip(s). Review, audition and curate what gets stitched.`;
+        summary.textContent = `${hits} hits → ${data.count} clips`;
+        summary.title = '';
       } else {
-        summary.textContent = 'Review, audition and curate what gets stitched.';
+        summary.textContent = '';
+        summary.title = '';
       }
     }
     $('curated-count').textContent = data.selected_count;

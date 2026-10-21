@@ -692,3 +692,6 @@ kbd { background: #333; border-color: #6a6a6a; color: #fff; }
 
 /* Download links only make sense in a real browser; the desktop window opens files directly */
 body.desktop .browser-only { display: none !important; }
+
+.card-title[title], .label-row[title], .check[title] { cursor: help; }
+.card-title[title]::after { content: " ⓘ"; font-size: 13px; color: #8a8a8a; font-weight: 400; vertical-align: super; }
