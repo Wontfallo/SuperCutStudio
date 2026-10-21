@@ -218,6 +218,28 @@ def _start_server(port: int) -> threading.Thread:
     return t
 
 
+_SPLASH = None
+
+
+def _splash(text: str | None = None, close: bool = False) -> None:
+    """Drive the startup splash (native Win32 window; a no-op on other platforms or once closed)."""
+    global _SPLASH
+    try:
+        if _SPLASH is None:
+            if close:
+                return
+            from supercut.server.splash import show_splash
+
+            _SPLASH = show_splash(resource_root() / "static" / "splash.bmp", text or "Starting...")
+            return
+        if close:
+            _SPLASH.close()
+        elif text:
+            _SPLASH.set_text(text)
+    except Exception:
+        pass
+
+
 def _icon_path() -> str | None:
     for cand in (resource_root() / "static" / "app.ico", resource_root() / "app.ico"):
         if cand.exists():
@@ -274,6 +296,7 @@ def _run_webview(url: str) -> bool:
         )
         window_holder["win"] = window
         register_native_picker(picker)
+        window.events.shown += lambda: _splash(close=True)
 
         def _on_closed():
             _cleanup_on_exit()
@@ -307,8 +330,11 @@ def main() -> int:
     import atexit
 
     log_path = setup_logging(filename="desktop.log")
+    _splash("Checking for a running copy...")
     if not _takeover_previous_instance():
+        _splash(close=True)
         return 2
+    _splash("Starting the studio server...")
     port = _free_port(int(os.environ.get("VKS_PORT", "8765")))
     url = f"http://127.0.0.1:{port}"
     log.info("%s v%s starting on %s (log: %s)", APP_NAME, __version__, url, log_path)
@@ -317,6 +343,7 @@ def main() -> int:
     _write_instance_file(port)
     atexit.register(_cleanup_on_exit)
     if not _wait_for_server(url):
+        _splash(close=True)
         log.error("Server did not start in time")
         try:
             import ctypes
@@ -329,7 +356,9 @@ def main() -> int:
 
     headless = os.environ.get("VKS_HEADLESS") == "1" or "--headless" in sys.argv
     force_browser = os.environ.get("VKS_BROWSER") == "1" or "--browser" in sys.argv
+    _splash("Opening the studio window...")
     if headless:
+        _splash(close=True)
         print(f"{APP_NAME} is running headless at {url}. Press Ctrl+C to stop.", flush=True)
         try:
             while True:
@@ -338,6 +367,7 @@ def main() -> int:
             pass
         return 0
     if force_browser or not _run_webview(url):
+        _splash(close=True)
         webbrowser.open(url)
         print(f"{APP_NAME} is running at {url}. Press Ctrl+C to stop.")
         try:

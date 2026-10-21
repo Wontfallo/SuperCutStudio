@@ -17,6 +17,36 @@ sys.path.insert(0, str(ROOT))
 APP_NAME = "SuperCutStudio"
 ICON = str(ROOT / "static" / "app.ico")
 
+from supercut import __version__ as APP_VERSION  # noqa: E402
+from PyInstaller.utils.win32.versioninfo import (  # noqa: E402
+    FixedFileInfo, StringFileInfo, StringStruct, StringTable, VSVersionInfo, VarFileInfo, VarStruct,
+)
+
+
+def _version_tuple(v):
+    parts = [int(p) for p in v.split(".")[:3] if p.isdigit()]
+    while len(parts) < 4:
+        parts.append(0)
+    return tuple(parts)
+
+
+VERSION_INFO = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_version_tuple(APP_VERSION), prodvers=_version_tuple(APP_VERSION)),
+    kids=[
+        StringFileInfo([StringTable("040904B0", [
+            StringStruct("CompanyName", "Wontfallo"),
+            StringStruct("FileDescription", "SuperCut Studio"),
+            StringStruct("FileVersion", APP_VERSION),
+            StringStruct("InternalName", APP_NAME),
+            StringStruct("OriginalFilename", f"{APP_NAME}.exe"),
+            StringStruct("ProductName", "SuperCut Studio"),
+            StringStruct("ProductVersion", APP_VERSION),
+            StringStruct("LegalCopyright", "Wontfallo"),
+        ])]),
+        VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+    ],
+)
+
 datas = [
     (str(ROOT / "static"), "static"),
 ]
@@ -90,6 +120,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -107,6 +138,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=ICON,
+    version=VERSION_INFO,
 )
 
 coll = COLLECT(
